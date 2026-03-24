@@ -31,8 +31,16 @@ import warnings
 warnings.filterwarnings("ignore")
 
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
-MODELS_DIR   = os.path.join(SCRIPT_DIR, "..", "models")
-DATA_DIR     = os.path.join(SCRIPT_DIR, "..", "data", "raw")
+
+# Resolve models directory: works both locally (../models) and on Vercel (./models)
+_models_parent = os.path.join(SCRIPT_DIR, "..", "models")
+_models_local  = os.path.join(SCRIPT_DIR, "models")
+MODELS_DIR   = _models_parent if os.path.isdir(_models_parent) else _models_local
+
+# Resolve data directory: reviews.csv only used locally (too large for Vercel)
+_data_parent  = os.path.join(SCRIPT_DIR, "..", "data", "raw")
+_data_local   = os.path.join(SCRIPT_DIR, "data", "raw")
+DATA_DIR      = _data_parent if os.path.isdir(_data_parent) else _data_local
 REVIEWS_PATH = os.path.join(DATA_DIR, "reviews.csv")
 
 # ── NLP feature defaults (matches training-time defaults in run_pipeline.py) ──
