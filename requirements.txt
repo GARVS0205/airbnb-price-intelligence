@@ -1,0 +1,44 @@
+# Core data science
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+
+# Machine learning
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+lightgbm>=4.0.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.18.0
+
+# NLP
+nltk>=3.8.0
+vaderSentiment>=3.3.2
+textblob>=0.17.0
+
+# Model serialization
+joblib>=1.3.0
+
+# SHAP for model interpretability
+shap>=0.44.0
+
+# Geospatial
+geopy>=2.4.0
+
+# Jupyter
+jupyter>=1.0.0
+notebook>=7.0.0
+ipykernel>=6.20.0
+nbconvert>=7.0.0
+
+# Utilities
+tqdm>=4.65.0
+python-dotenv>=1.0.0
+
+# Missing value visualization
+missingno>=0.5.2
+
+# Category encoders
+category-encoders>=2.6.0

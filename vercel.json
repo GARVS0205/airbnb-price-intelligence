@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "buildCommand": "cd app && npm run build",
+  "outputDirectory": "app/.next",
+  "installCommand": "cd app && npm install",
+  "framework": "nextjs",
+  "functions": {
+    "app/app/api/predict/route.ts": {
+      "maxDuration": 30
+    },
+    "app/app/api/analyze-reviews/route.ts": {
+      "maxDuration": 30
+    }
+  }
+}
