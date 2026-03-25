@@ -34,7 +34,7 @@ function runPythonScript(
   payload: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    const python = spawn("python", ["-X", "utf8", scriptPath]);
+    const python = spawn("python3", ["-X", "utf8", scriptPath]);
     let stdout = "";
     let stderr = "";
 

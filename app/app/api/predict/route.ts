@@ -142,7 +142,7 @@ function runPythonInference(
   features: Record<string, number>
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    const python = spawn("python", [scriptPath]);
+    const python = spawn("python3", [scriptPath]);
     let stdout = "";
     let stderr = "";
 
