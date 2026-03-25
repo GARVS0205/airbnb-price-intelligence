@@ -183,10 +183,63 @@ def load_artifacts():
     except Exception as e:
         return None, None, None, str(e)
 
+# ── Callable API (used by Flask server.py) ──────────────────────────────────
+def run_inference(payload: dict) -> dict:
+    """
+    Run prediction on a feature dict. Returns the output dict directly.
+    Used by server.py (Flask) to avoid subprocess overhead on Vercel alternatives.
+    """
+    import numpy as np
 
-# ── Main ────────────────────────────────────────────────────────────────────
+    errors = validate_inputs(payload)
+    if errors:
+        return {"error": "Input validation failed", "details": errors}
+
+    model, scaler, feature_names, load_err = load_artifacts()
+    if load_err:
+        return {"error": f"Model loading failed: {load_err}"}
+
+    listing_id = payload.get("listing_id")
+    nlp_features = {}
+    nlp_used = False
+
+    if listing_id:
+        nlp_features = compute_review_nlp_features(int(listing_id))
+        nlp_used = nlp_features.get("review_avg_sentiment", 0.0) != 0.0 \
+                or nlp_features.get("review_quality_score", 50.0) != 50.0
+
+    merged = {**payload, **nlp_features}
+    x = np.array(
+        [float(merged.get(f, 0.0)) for f in feature_names], dtype=np.float32
+    ).reshape(1, -1)
+
+    x_scaled   = scaler.transform(x)
+    log_pred   = float(model.predict(x_scaled)[0])
+    price      = float(np.expm1(log_pred))
+    price_low  = round(price * 0.82, 2)
+    price_high = round(price * 1.18, 2)
+
+    top_features = []
+    if hasattr(model, "feature_importances_"):
+        imp = sorted(
+            zip(feature_names, model.feature_importances_),
+            key=lambda x: x[1], reverse=True
+        )[:5]
+        top_features = [{"feature": f, "importance": round(float(v), 4)} for f, v in imp]
+
+    return {
+        "predicted_price":     round(price, 2),
+        "price_low":           price_low,
+        "price_high":          price_high,
+        "log_prediction":      round(log_pred, 4),
+        "top_features":        top_features,
+        "review_nlp_used":     nlp_used,
+        "review_nlp_features": nlp_features if nlp_used else None,
+    }
+
+
+# ── Main (stdin/stdout for local subprocess use) ─────────────────────────────
 def main():
-    # Read JSON from stdin
     try:
         raw = sys.stdin.read().strip()
         if not raw:
@@ -196,70 +249,9 @@ def main():
         print(json.dumps({"error": f"Failed to parse input: {e}"}))
         sys.exit(1)
 
-    # Validate
-    errors = validate_inputs(payload)
-    if errors:
-        print(json.dumps({"error": "Input validation failed", "details": errors}))
-        sys.exit(0)
-
-    # Load model
-    model, scaler, feature_names, load_err = load_artifacts()
-    if load_err:
-        print(json.dumps({"error": f"Model loading failed: {load_err}"}))
-        sys.exit(1)
-
-    try:
-        import numpy as np
-
-        # ── Compute NLP features from reviews.csv if listing_id provided ──────
-        listing_id = payload.get("listing_id")
-        nlp_features = {}
-        nlp_used = False
-
-        if listing_id:
-            nlp_features = compute_review_nlp_features(int(listing_id))
-            # "used" means we got real data (not all defaults)
-            nlp_used = nlp_features.get("review_avg_sentiment", 0.0) != 0.0 \
-                    or nlp_features.get("review_quality_score", 50.0) != 50.0
-
-        # ── Build feature vector ───────────────────────────────────────────────
-        # NLP features override payload defaults if computed from real reviews
-        merged = {**payload, **nlp_features}
-
-        x = np.array(
-            [float(merged.get(f, 0.0)) for f in feature_names], dtype=np.float32
-        ).reshape(1, -1)
-
-        x_scaled = scaler.transform(x)
-        log_pred  = float(model.predict(x_scaled)[0])
-        price     = float(np.expm1(log_pred))
-
-        price_low  = round(price * 0.82, 2)
-        price_high = round(price * 1.18, 2)
-
-        # Top 5 feature importances
-        top_features = []
-        if hasattr(model, "feature_importances_"):
-            imp = sorted(
-                zip(feature_names, model.feature_importances_),
-                key=lambda x: x[1], reverse=True
-            )[:5]
-            top_features = [{"feature": f, "importance": round(float(v), 4)} for f, v in imp]
-
-        output = {
-            "predicted_price":    round(price, 2),
-            "price_low":          price_low,
-            "price_high":         price_high,
-            "log_prediction":     round(log_pred, 4),
-            "top_features":       top_features,
-            # NLP features used in this prediction (for UI display)
-            "review_nlp_used":    nlp_used,
-            "review_nlp_features": nlp_features if nlp_used else None,
-        }
-        print(json.dumps(output))
-
-    except Exception as e:
-        print(json.dumps({"error": f"Prediction failed: {e}"}))
+    result = run_inference(payload)
+    print(json.dumps(result))
+    if result.get("error"):
         sys.exit(1)
 
 

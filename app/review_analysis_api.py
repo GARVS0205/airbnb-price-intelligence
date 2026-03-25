@@ -296,21 +296,31 @@ def main():
                 "text":    text[:400] + ("…" if len(text) > 400 else ""),
             })
 
-    # ── Output ────────────────────────────────────────────────────────────
-    output = {
-        "listing_id":    listing_id,
-        "total_reviews": total_rev,
+    return {
+        "listing_id":             listing_id,
+        "total_reviews":          total_rev,
         "avg_review_length_words": round(avg_len, 1),
-        "sentiment":     sentiment,
-        "quality_score": quality,
-        "themes":        themes,
-        "red_flags":     flags,
-        "timeline":      timeline,
-        "sample_reviews": samples,
+        "sentiment":              sentiment,
+        "quality_score":          quality,
+        "themes":                 themes,
+        "red_flags":              flags,
+        "timeline":               timeline,
+        "sample_reviews":         samples,
     }
-    sys.stdout.write(json.dumps(output))
-    sys.stdout.flush()
 
 
+# ── Callable API (used by Flask server.py) ───────────────────────────────────
+def run_analysis(listing_id: int, max_reviews: int = 300) -> dict:
+    """
+    Run review analysis and return the result dict directly.
+    Used by server.py (Flask) to avoid subprocess overhead.
+    """
+    reviews = load_reviews(listing_id, max_reviews)
+    if reviews is None or len(reviews) == 0:
+        return {"error": f"No reviews found for listing {listing_id}"}
+    return analyse(reviews, listing_id)
+
+
+# ── Main (stdin/stdout for local subprocess use) ─────────────────────────────
 if __name__ == "__main__":
     main()

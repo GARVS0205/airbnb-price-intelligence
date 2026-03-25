@@ -42,3 +42,8 @@ missingno>=0.5.2
 
 # Category encoders
 category-encoders>=2.6.0
+
+# Flask API server (for Railway/Render deployment)
+flask>=3.0.0
+flask-cors>=4.0.0
+gunicorn>=21.0.0
