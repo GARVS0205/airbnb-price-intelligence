@@ -315,10 +315,40 @@ def run_analysis(listing_id: int, max_reviews: int = 300) -> dict:
     Run review analysis and return the result dict directly.
     Used by server.py (Flask) to avoid subprocess overhead.
     """
-    reviews = load_reviews(listing_id, max_reviews)
-    if reviews is None or len(reviews) == 0:
-        return {"error": f"No reviews found for listing {listing_id}"}
-    return analyse(reviews, listing_id)
+    reviews_df, error = load_reviews(listing_id, max_reviews)
+    if error:
+        return {"error": error, "listing_id": listing_id}
+
+    texts     = reviews_df["comments"].dropna().tolist()
+    total_rev = len(reviews_df)
+    avg_len   = sum(len(t.split()) for t in texts) / max(1, len(texts))
+
+    sentiment = analyze_sentiment(texts)
+    themes    = detect_themes(texts)
+    quality   = compute_quality_score(sentiment, themes, total_rev, avg_len)
+    flags     = detect_red_flags(reviews_df)
+    timeline  = make_timeline(reviews_df)
+
+    samples = []
+    for _, row in reviews_df.head(5).iterrows():
+        text = str(row.get("comments", ""))
+        if text and len(text) > 5:
+            samples.append({
+                "date": str(row.get("date", ""))[:10],
+                "text": text[:400] + ("…" if len(text) > 400 else ""),
+            })
+
+    return {
+        "listing_id":              listing_id,
+        "total_reviews":           total_rev,
+        "avg_review_length_words": round(avg_len, 1),
+        "sentiment":               sentiment,
+        "quality_score":           quality,
+        "themes":                  themes,
+        "red_flags":               flags,
+        "timeline":                timeline,
+        "sample_reviews":          samples,
+    }
 
 
 # ── Main (stdin/stdout for local subprocess use) ─────────────────────────────
