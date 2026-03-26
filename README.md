@@ -2,7 +2,7 @@
 
 > NYC Airbnb nightly price estimator — powered by a machine learning model trained on 20,700+ real listings with NLP review sentiment analysis.
 
-**Live demo:** _add Vercel URL here after deploy_
+**Live demo:** [https://listinglens.vercel.app](https://listinglens.vercel.app)
 
 ---
 
@@ -19,16 +19,17 @@ The **Review Analysis** tool lets you inspect the review quality of any NYC Airb
 
 ---
 
-## Tech Stack
+## Tech Stack & Architecture
 
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js 15 (App Router), TypeScript |
-| Styling | Vanilla CSS with custom design system |
-| ML Model | XGBoost (trained offline, loaded at inference time) |
-| NLP | VADER sentiment analysis on 700k+ reviews |
-| API | Next.js API routes spawn Python subprocesses |
-| Deployment | Vercel |
+This application uses a **split-stack architecture** to bypass serverless environment limitations:
+
+| Layer | Technology | Deployment |
+|---|---|---|
+| **Frontend** | Next.js 15 (App Router), TypeScript | Vercel |
+| **Backend API** | Python, Flask, Gunicorn | Render |
+| **ML Model** | Local XGBoost inference (`predict_api.py`) | Render |
+| **Database** | Precomputed SQLite DB (`reviews_summary.db`) | Render |
+| **NLP** | VaderSentiment (Pre-processing only) | Local |
 
 ---
 
@@ -74,6 +75,11 @@ npm run dev
 
 App runs at `http://localhost:3000`
 
+### Windows shell tips
+- If PowerShell blocks npm or venv scripts, run `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force` in the current shell.
+- Prefer `python` (or set `PYTHON_CMD=python`) because `python3` is not available on Windows by default.
+- Use `npm.cmd` if `npm` is blocked by execution policy.
+
 ---
 
 ## Data
@@ -83,8 +89,16 @@ Raw CSV files are excluded from the repository due to size (400MB+). Model artif
 
 ---
 
-## Deployment
+## Deployment Architecture
 
-This project is configured for **Vercel**. The `vercel.json` at the root handles the monorepo layout (Next.js app in `app/` subdirectory).
+Due to Vercel's serverless environment constraints (50MB size limit, missing Python runtime) the application uses a **distributed architecture** in production.
 
-> **Note:** Vercel's serverless functions spawn Python subprocesses for ML inference. Python and required packages must be available in the Vercel build environment. See `requirements.txt`.
+1. **Frontend (Vercel)** `https://listinglens.vercel.app`
+    - Next.js application handling UI and routing.
+    - API routes (`/api/predict` and `/api/analyze-reviews`) check for the `PYTHON_API_URL` environment variable.
+2. **Backend (Render)** `https://listinglens-ru9r.onrender.com`
+    - A lightweight Flask server (`app/server.py`) serving as a REST API.
+    - Executes the ML inference using the trained XGBoost `.pkl` models.
+    - Queries `models/reviews_summary.db` for instant NLP insights, avoiding the need to process the 314MB raw CSV in production.
+
+**Local Fallback:** In development (when `PYTHON_API_URL` is undefined), the Next.js app automatically falls back to spawning a local `python3` subprocess to execute `predict_api.py`.
