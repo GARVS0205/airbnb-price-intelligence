@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import InputForm from "@/components/InputForm";
 import PredictionDisplay from "@/components/PredictionDisplay";
 import { PredictionResult, FormData } from "@/types";
@@ -16,6 +16,14 @@ export default function PredictPage() {
   const [error, setError]           = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string[]>([]);
   const [formData, setFormData]     = useState<FormData | null>(null);
+  const [backendWarm, setBackendWarm] = useState(false);
+
+  // Silently wake up the Render backend when the page loads
+  useEffect(() => {
+    fetch("/api/ping", { method: "GET" })
+      .then(() => setBackendWarm(true))
+      .catch(() => setBackendWarm(true)); // still mark warm even if ping fails
+  }, []);
 
   const handlePredict = async (data: FormData) => {
     setLoading(true); setError(null); setErrorDetails([]); setFormData(data);

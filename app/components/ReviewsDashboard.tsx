@@ -164,6 +164,11 @@ export default function ReviewsDashboard() {
   const [result,   setResult]   = useState<Analysis | null>(null);
   const [error,    setError]    = useState<string | null>(null);
 
+  // Silently wake up the Render backend as soon as the Review page loads
+  useEffect(() => {
+    fetch("/api/ping", { method: "GET" }).catch(() => {});
+  }, []);
+
   const isNotFound = error?.toLowerCase().includes("no reviews found");
 
   const analyze = async (listing: ListingMeta) => {
