@@ -253,6 +253,32 @@ def make_timeline(reviews_df, bins: int = 8) -> list:
         return []
 
 
+def run_analysis(listing_id: int, max_reviews: int = 300) -> dict:
+    """
+    Run review analysis and return the result dict directly.
+    Reads from the precomputed SQLite database to support serverless deployment.
+    """
+    import sqlite3
+    db_path = os.path.join(BASE_DIR, "models", "reviews_summary.db")
+    
+    if not os.path.exists(db_path):
+        return {"error": "Precomputed reviews database not found. Run precompute_reviews.py first."}
+        
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT analysis_data FROM reviews_summary WHERE listing_id = ?", (listing_id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row and row[0] and row[0] != "{}":
+            return json.loads(row[0])
+            
+    except Exception as e:
+        return {"error": f"Database error: {e}"}
+        
+    return {"error": f"No reviews found for listing {listing_id}"}
+
 def main():
     # ── Read input from stdin ──────────────────────────────────────────────
     try:
@@ -263,92 +289,14 @@ def main():
         sys.exit(1)
 
     listing_id  = int(payload.get("listing_id", 0))
-    max_reviews = int(payload.get("max_reviews", 300))
 
     if listing_id == 0:
         print(json.dumps({"error": "listing_id is required"}))
         sys.exit(0)
 
-    # ── Load reviews ───────────────────────────────────────────────────────
-    reviews_df, error = load_reviews(listing_id, max_reviews)
-    if error:
-        print(json.dumps({"error": error, "listing_id": listing_id}))
-        sys.exit(0)
-
-    texts     = reviews_df["comments"].dropna().tolist()
-    total_rev = len(reviews_df)
-    avg_len   = sum(len(t.split()) for t in texts) / max(1, len(texts))
-
-    # ── Analysis ──────────────────────────────────────────────────────────
-    sentiment = analyze_sentiment(texts)
-    themes    = detect_themes(texts)
-    quality   = compute_quality_score(sentiment, themes, total_rev, avg_len)
-    flags     = detect_red_flags(reviews_df)
-    timeline  = make_timeline(reviews_df)
-
-    # ── Sample reviews (most recent 5) ────────────────────────────────────
-    samples = []
-    for _, row in reviews_df.head(5).iterrows():
-        text = str(row.get("comments", ""))
-        if text and len(text) > 5:
-            samples.append({
-                "date":    str(row.get("date", ""))[:10],
-                "text":    text[:400] + ("…" if len(text) > 400 else ""),
-            })
-
-    return {
-        "listing_id":             listing_id,
-        "total_reviews":          total_rev,
-        "avg_review_length_words": round(avg_len, 1),
-        "sentiment":              sentiment,
-        "quality_score":          quality,
-        "themes":                 themes,
-        "red_flags":              flags,
-        "timeline":               timeline,
-        "sample_reviews":         samples,
-    }
-
-
-# ── Callable API (used by Flask server.py) ───────────────────────────────────
-def run_analysis(listing_id: int, max_reviews: int = 300) -> dict:
-    """
-    Run review analysis and return the result dict directly.
-    Used by server.py (Flask) to avoid subprocess overhead.
-    """
-    reviews_df, error = load_reviews(listing_id, max_reviews)
-    if error:
-        return {"error": error, "listing_id": listing_id}
-
-    texts     = reviews_df["comments"].dropna().tolist()
-    total_rev = len(reviews_df)
-    avg_len   = sum(len(t.split()) for t in texts) / max(1, len(texts))
-
-    sentiment = analyze_sentiment(texts)
-    themes    = detect_themes(texts)
-    quality   = compute_quality_score(sentiment, themes, total_rev, avg_len)
-    flags     = detect_red_flags(reviews_df)
-    timeline  = make_timeline(reviews_df)
-
-    samples = []
-    for _, row in reviews_df.head(5).iterrows():
-        text = str(row.get("comments", ""))
-        if text and len(text) > 5:
-            samples.append({
-                "date": str(row.get("date", ""))[:10],
-                "text": text[:400] + ("…" if len(text) > 400 else ""),
-            })
-
-    return {
-        "listing_id":              listing_id,
-        "total_reviews":           total_rev,
-        "avg_review_length_words": round(avg_len, 1),
-        "sentiment":               sentiment,
-        "quality_score":           quality,
-        "themes":                  themes,
-        "red_flags":               flags,
-        "timeline":                timeline,
-        "sample_reviews":          samples,
-    }
+    # ── Fetch precomputed analysis ─────────────────────────────────────────
+    result = run_analysis(listing_id)
+    print(json.dumps(result))
 
 
 # ── Main (stdin/stdout for local subprocess use) ─────────────────────────────

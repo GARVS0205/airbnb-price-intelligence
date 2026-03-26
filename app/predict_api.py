@@ -98,72 +98,33 @@ def compute_review_nlp_features(listing_id: int) -> dict:
     features = dict(NLP_DEFAULTS)  # start with defaults
 
     try:
-        import pandas as pd
-        import numpy as np
-        from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
-        if not os.path.exists(REVIEWS_PATH):
+        import sqlite3
+        import json
+        
+        db_path = os.path.join(BASE_DIR, "models", "reviews_summary.db")
+        if not os.path.exists(db_path):
             return features
 
-        rev_df = pd.read_csv(
-            REVIEWS_PATH,
-            usecols=["listing_id", "date", "comments"],
-            dtype={"listing_id": int, "comments": str},
-            parse_dates=["date"],
-            low_memory=False,
-        )
-        rev_df = rev_df[rev_df["listing_id"] == listing_id].copy()
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT predict_features FROM reviews_summary WHERE listing_id = ?", (listing_id,))
+        row = cursor.fetchone()
+        conn.close()
 
-        if len(rev_df) == 0:
-            return features  # new listing — use defaults
+        if row and row[0] and row[0] != "{}":
+            data = json.loads(row[0])
+            features.update({
+                "review_avg_sentiment":    data.get("review_avg_sentiment", 0.0),
+                "review_positive_pct":     data.get("review_positive_pct", 0.0),
+                "review_negative_pct":     data.get("review_negative_pct", 0.0),
+                "review_avg_word_count":   data.get("review_avg_length", 0.0),
+                "review_quality_score":    data.get("review_quality_score", 0.0),
+                "review_sentiment_trend":  data.get("composite_review_score", 0.0),
+            })
+            
+    except Exception as e:
+        print(f"Error fetching review NLP features from DB: {e}")
 
-        rev_df = rev_df.dropna(subset=["comments"])
-        rev_df = rev_df[rev_df["comments"].str.strip().str.len() > 5]
-
-        if len(rev_df) == 0:
-            return features
-
-        sia = SentimentIntensityAnalyzer()
-
-        rev_df["compound"]    = rev_df["comments"].apply(
-            lambda t: sia.polarity_scores(str(t)[:1000])["compound"]
-        )
-        rev_df["word_count"]  = rev_df["comments"].apply(lambda t: len(str(t).split()))
-        rev_df["is_positive"] = (rev_df["compound"] >= 0.05).astype(int)
-        rev_df["is_negative"] = (rev_df["compound"] <= -0.05).astype(int)
-
-        avg_compound  = float(rev_df["compound"].mean())
-        positive_pct  = float(rev_df["is_positive"].mean() * 100)
-        negative_pct  = float(rev_df["is_negative"].mean() * 100)
-        avg_words     = float(rev_df["word_count"].mean())
-        n_reviews     = len(rev_df)
-
-        # Quality score (same formula as run_pipeline.py)
-        quality_score = float(
-            ((avg_compound + 1) / 2 * 40)
-            + min(20, n_reviews / 5)
-            + min(20, avg_words / 15)
-        )
-        quality_score = max(0.0, min(80.0, quality_score))
-
-        # Sentiment trend: recent (last 180 days) vs overall
-        if "date" in rev_df.columns:
-            max_date = rev_df["date"].max()
-            cutoff   = max_date - pd.Timedelta(days=180)
-            recent   = rev_df[rev_df["date"] >= cutoff]
-            recent_avg = float(recent["compound"].mean()) if len(recent) > 0 else avg_compound
-            trend = recent_avg - avg_compound
-        else:
-            trend = 0.0
-
-        features.update({
-            "review_avg_sentiment":    round(avg_compound, 4),
-            "review_positive_pct":     round(positive_pct, 2),
-            "review_negative_pct":     round(negative_pct, 2),
-            "review_avg_word_count":   round(avg_words, 2),
-            "review_quality_score":    round(quality_score, 2),
-            "review_sentiment_trend":  round(trend, 4),
-        })
 
     except Exception:
         pass  # silently fall back to defaults
