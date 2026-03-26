@@ -173,6 +173,31 @@ def run_inference(payload: dict) -> dict:
                 or nlp_features.get("review_quality_score", 50.0) != 50.0
 
     merged = {**payload, **nlp_features}
+
+    # ── Reconstruct missing engineered features ────────────────────────────────
+    # These were computed during training by src/feature_engineering.py but are missing from the raw payload
+    merged["accommodates_sq"] = merged.get("accommodates", 0) ** 2
+    merged["beds_per_person"] = float(merged.get("beds", 1)) / max(float(merged.get("accommodates", 1)), 1.0)
+    merged["availability_rate"] = float(merged.get("availability_365", 0)) / 365.0
+    merged["has_reviews"] = 1 if float(merged.get("number_of_reviews", 0)) > 0 else 0
+    merged["log_number_of_reviews"] = float(np.log1p(max(float(merged.get("number_of_reviews", 0)), 0)))
+    merged["composite_review_score"] = float(merged.get("review_scores_rating", 0.0))
+    merged["review_recency_bucket"] = 2.0  # default
+    merged["reviews_x_score"] = merged["log_number_of_reviews"] * merged["composite_review_score"]
+    merged["capacity_x_bedrooms"] = float(merged.get("accommodates", 0)) * float(merged.get("bedrooms", 0))
+    merged["luxury_x_capacity"] = float(merged.get("premium_amenity_score", 0)) * float(merged.get("accommodates", 0))
+    
+    # Host features
+    merged["host_quality_score"] = (float(merged.get("is_superhost", 0)) + float(merged.get("host_response_rate", 0)) + float(merged.get("host_acceptance_rate", 0))) / 3.0
+    merged["host_experience_years"] = 3.0 # default
+    merged["is_professional_host"] = 1 if float(merged.get("calculated_host_listings_count", 1)) >= 5 else 0
+    
+    # Text metadata features
+    merged["desc_word_count"] = 100.0
+    merged["desc_sentiment"] = 0.5
+    merged["has_cozy_keywords"] = 0
+    merged["has_spacious_keywords"] = 0
+
     x = np.array(
         [float(merged.get(f, 0.0)) for f in feature_names], dtype=np.float32
     ).reshape(1, -1)
