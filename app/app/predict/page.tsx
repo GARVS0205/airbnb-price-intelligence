@@ -14,14 +14,20 @@ export default function PredictPage() {
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string[]>([]);
   const [formData, setFormData]     = useState<FormData | null>(null);
 
   const handlePredict = async (data: FormData) => {
-    setLoading(true); setError(null); setFormData(data);
+    setLoading(true); setError(null); setErrorDetails([]); setFormData(data);
     try {
       const res  = await fetch("/api/predict", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
       const json = await res.json();
-      if (!res.ok || json.error) throw new Error(json.error || "Prediction failed");
+      if (!res.ok || json.error) {
+        if (json.details && Array.isArray(json.details)) {
+          setErrorDetails(json.details);
+        }
+        throw new Error(json.error || "Prediction failed");
+      }
       setPrediction(json);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -71,8 +77,14 @@ export default function PredictPage() {
             <div>
               {error && (
                 <div style={{ padding: "14px 18px", borderRadius: 10, background: "var(--error-dim)", marginBottom: 16 }}>
-                  <p style={{ fontSize: 13, color: "var(--error)", fontWeight: 500 }}>Prediction failed</p>
-                  <p style={{ fontSize: 12, color: "var(--error)", marginTop: 4, opacity: 0.8 }}>{error}</p>
+                  <p style={{ fontSize: 13, color: "var(--error)", fontWeight: 500 }}>{error}</p>
+                  {errorDetails.length > 0 && (
+                    <ul style={{ fontSize: 12, color: "var(--error)", marginTop: 6, opacity: 0.8, paddingLeft: 18, marginBottom: 0 }}>
+                      {errorDetails.map((detail, idx) => (
+                        <li key={idx} style={{ marginBottom: 4 }}>{detail}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
               {prediction ? (

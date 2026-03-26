@@ -80,10 +80,13 @@ def validate_inputs(payload: dict) -> list:
         try:
             v = float(val)
         except (TypeError, ValueError):
-            errors.append(f"'{field}' must be a number, got: {val!r}")
+            friendly = field.replace("_", " ").title()
+            errors.append(f"{friendly} must be a number (you provided: {val!r})")
             continue
         if not (lo <= v <= hi):
-            errors.append(f"'{field}' must be between {lo} and {hi}, got: {v}")
+            friendly = field.replace('_', ' ').title()
+            if field == "accommodates": friendly = "Guest Capacity (Accommodates)"
+            errors.append(f"{friendly} must be between {lo} and {hi} (you provided: {v})")
     return errors
 
 
