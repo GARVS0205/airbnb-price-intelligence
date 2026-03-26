@@ -101,7 +101,7 @@ def compute_review_nlp_features(listing_id: int) -> dict:
         import sqlite3
         import json
         
-        db_path = os.path.join(BASE_DIR, "models", "reviews_summary.db")
+        db_path = os.path.join(SCRIPT_DIR, "models", "reviews_summary.db")
         if not os.path.exists(db_path):
             return features
 
