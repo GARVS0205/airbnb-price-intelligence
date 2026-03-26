@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { spawn } from "child_process";
 
-export const maxDuration = 60; // Allow enough time for Render cold-starts
+export const maxDuration = 80; // Allow enough time for Render cold-starts
 
 /**
  * POST /api/predict
