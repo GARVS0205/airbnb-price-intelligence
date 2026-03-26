@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { spawn } from "child_process";
 
+export const maxDuration = 60; // Allow enough time for Render cold-starts
+
 /**
  * POST /api/analyze-reviews
  *
@@ -33,7 +35,8 @@ export async function POST(request: NextRequest) {
     } else {
       // ── Development: spawn Python subprocess ────────────────────────────
       const scriptPath = path.join(process.cwd(), "review_analysis_api.py");
-      const result = await runPythonScript(scriptPath, { listing_id, max_reviews });
+      const pythonCmd = resolvePythonCommand();
+      const result = await runPythonScript(scriptPath, { listing_id, max_reviews }, pythonCmd);
       return NextResponse.json(result, { status: 200 });
     }
 
@@ -44,13 +47,27 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// ── Cross-platform Python resolution (Windows friendly) ─────────────────────
+function resolvePythonCommand(): string {
+  if (process.env.PYTHON_CMD && process.env.PYTHON_CMD.trim()) {
+    return process.env.PYTHON_CMD.trim();
+  }
+  if (process.platform === "win32") {
+    return "python"; // Windows images typically expose `python` and `py`
+  }
+  return "python3"; // Unix-like default
+}
+
 // ── Local dev: Python subprocess ─────────────────────────────────────────────
 function runPythonScript(
   scriptPath: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  pythonCmd: string
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    const python = spawn("python3", ["-X", "utf8", scriptPath]);
+    const python = spawn(pythonCmd, ["-X", "utf8", scriptPath], {
+      shell: process.platform === "win32",
+    });
     let stdout = "";
     let stderr = "";
 

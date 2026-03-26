@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { spawn } from "child_process";
 
+export const maxDuration = 60; // Allow enough time for Render cold-starts
+
 /**
  * POST /api/predict
  *
@@ -38,7 +40,8 @@ export async function POST(request: NextRequest) {
     } else {
       // ── Development: spawn Python subprocess ────────────────────────────
       const scriptPath = path.join(process.cwd(), "predict_api.py");
-      const prediction = await runPythonInference(scriptPath, features);
+      const pythonCmd = resolvePythonCommand();
+      const prediction = await runPythonInference(scriptPath, features, pythonCmd);
       if ((prediction as Record<string, unknown>).details) {
         return NextResponse.json(prediction, { status: 422 });
       }
@@ -99,13 +102,27 @@ function sanitizeFeatures(body: Record<string, unknown>): Record<string, number>
   };
 }
 
+// ── Cross-platform Python resolution (Windows friendly) ─────────────────────
+function resolvePythonCommand(): string {
+  if (process.env.PYTHON_CMD && process.env.PYTHON_CMD.trim()) {
+    return process.env.PYTHON_CMD.trim();
+  }
+  if (process.platform === "win32") {
+    return "python"; // Windows images typically expose `python` and `py`
+  }
+  return "python3"; // Unix-like default
+}
+
 // ── Local dev: Python subprocess ─────────────────────────────────────────────
 function runPythonInference(
   scriptPath: string,
-  features: Record<string, unknown>
+  features: Record<string, unknown>,
+  pythonCmd: string
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
-    const python = spawn("python3", [scriptPath]);
+    const python = spawn(pythonCmd, [scriptPath], {
+      shell: process.platform === "win32", // allow python.cmd / py.exe
+    });
     let stdout = "";
     let stderr = "";
 
