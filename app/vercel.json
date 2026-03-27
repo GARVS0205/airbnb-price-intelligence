@@ -3,10 +3,19 @@
   "framework": "nextjs",
   "functions": {
     "app/api/predict/route.ts": {
-      "maxDuration": 30
+      "maxDuration": 80
     },
     "app/api/analyze-reviews/route.ts": {
-      "maxDuration": 30
+      "maxDuration": 80
+    },
+    "app/api/ping/route.ts": {
+      "maxDuration": 80
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/ping",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }

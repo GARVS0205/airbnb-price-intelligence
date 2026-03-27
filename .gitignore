@@ -84,3 +84,8 @@ logs/
 *.tmp
 coverage/
 .pytest_cache/
+
+# AI assistant workspace files (not project code)
+app/AGENTS.md
+app/CLAUDE.md
+app/README.md
