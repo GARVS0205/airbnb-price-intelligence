@@ -201,10 +201,30 @@ def run_inference(payload: dict) -> dict:
     x = np.array(
         [float(merged.get(f, 0.0)) for f in feature_names], dtype=np.float32
     ).reshape(1, -1)
+    x_scaled = scaler.transform(x)
+    log_pred = float(model.predict(x_scaled)[0])
+    price    = float(np.expm1(log_pred))
 
-    x_scaled   = scaler.transform(x)
-    log_pred   = float(model.predict(x_scaled)[0])
-    price      = float(np.expm1(log_pred))
+    # ── Room-type calibration ─────────────────────────────────────────────────
+    # The LabelEncoder assigns arbitrary integers (0=Entire,1=Hotel,2=Private,3=Shared).
+    # XGBoost tree splits group these into (0,1) and (2,3) buckets, losing the real
+    # price signal. Calibrate using median log-price per room type from training data
+    # (NYC-wide). Multiplier is relative to the citywide median (log‑price ≈ 5.14).
+    ROOM_TYPE_LOG_MEDIANS = {
+        0: 5.34,   # Entire home/apt  → median $208
+        1: 5.86,   # Hotel room       → median $349
+        2: 4.44,   # Private room     → median  $85
+        3: 3.88,   # Shared room      → median  $48
+    }
+    rt = int(float(merged.get("room_type_encoded", 0)))
+    if rt in ROOM_TYPE_LOG_MEDIANS:
+        citywide_log_median = 5.14
+        rt_log_median = ROOM_TYPE_LOG_MEDIANS[rt]
+        # Blended 50% weight: neighbourhood/capacity still dominate, room type adds real signal
+        log_adjustment = (rt_log_median - citywide_log_median) * 0.50
+        log_pred = log_pred + log_adjustment
+        price = float(np.expm1(log_pred))
+
     price_low  = round(price * 0.82, 2)
     price_high = round(price * 1.18, 2)
 
