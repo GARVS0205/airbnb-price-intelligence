@@ -143,9 +143,10 @@ def load_artifacts():
         scaler = joblib.load(os.path.join(MODELS_DIR, "scaler.pkl"))
         with open(os.path.join(MODELS_DIR, "feature_names.json")) as f:
             feat_meta = json.load(f)
-        return model, scaler, feat_meta["feature_names"], None
+        rt_means = feat_meta.get("room_type_mean_prices", {})
+        return model, scaler, feat_meta["feature_names"], rt_means, None
     except Exception as e:
-        return None, None, None, str(e)
+        return None, None, None, {}, str(e)
 
 # ── Callable API (used by Flask server.py) ──────────────────────────────────
 def run_inference(payload: dict) -> dict:
@@ -159,7 +160,7 @@ def run_inference(payload: dict) -> dict:
     if errors:
         return {"error": "Input validation failed", "details": errors}
 
-    model, scaler, feature_names, load_err = load_artifacts()
+    model, scaler, feature_names, rt_means, load_err = load_artifacts()
     if load_err:
         return {"error": f"Model loading failed: {load_err}"}
 
@@ -174,6 +175,20 @@ def run_inference(payload: dict) -> dict:
 
     merged = {**payload, **nlp_features}
 
+    # ── Apply room type target encoding at inference time ──────────────────────
+    # The model was trained with target-encoded room_type (mean log_price per type).
+    # The frontend sends a raw integer (0=Entire,1=Hotel,2=Private,3=Shared).
+    # We map back using the training-time means saved in feature_names.json.
+    RT_LABEL_TO_NAME = {
+        0: "Entire home/apt",
+        1: "Hotel room",
+        2: "Private room",
+        3: "Shared room",
+    }
+    if rt_means:
+        raw_rt = int(float(merged.get("room_type_encoded", 0)))
+        rt_name = RT_LABEL_TO_NAME.get(raw_rt, "Entire home/apt")
+        merged["room_type_encoded"] = rt_means.get(rt_name, rt_means.get("Entire home/apt", 5.14))
     # ── Reconstruct missing engineered features ────────────────────────────────
     # These were computed during training by src/feature_engineering.py but are missing from the raw payload
     merged["accommodates_sq"] = merged.get("accommodates", 0) ** 2
@@ -201,29 +216,9 @@ def run_inference(payload: dict) -> dict:
     x = np.array(
         [float(merged.get(f, 0.0)) for f in feature_names], dtype=np.float32
     ).reshape(1, -1)
-    x_scaled = scaler.transform(x)
-    log_pred = float(model.predict(x_scaled)[0])
-    price    = float(np.expm1(log_pred))
-
-    # ── Room-type calibration ─────────────────────────────────────────────────
-    # The LabelEncoder assigns arbitrary integers (0=Entire,1=Hotel,2=Private,3=Shared).
-    # XGBoost tree splits group these into (0,1) and (2,3) buckets, losing the real
-    # price signal. Calibrate using median log-price per room type from training data
-    # (NYC-wide). Multiplier is relative to the citywide median (log‑price ≈ 5.14).
-    ROOM_TYPE_LOG_MEDIANS = {
-        0: 5.34,   # Entire home/apt  → median $208
-        1: 5.86,   # Hotel room       → median $349
-        2: 4.44,   # Private room     → median  $85
-        3: 3.88,   # Shared room      → median  $48
-    }
-    rt = int(float(merged.get("room_type_encoded", 0)))
-    if rt in ROOM_TYPE_LOG_MEDIANS:
-        citywide_log_median = 5.14
-        rt_log_median = ROOM_TYPE_LOG_MEDIANS[rt]
-        # Blended 50% weight: neighbourhood/capacity still dominate, room type adds real signal
-        log_adjustment = (rt_log_median - citywide_log_median) * 0.50
-        log_pred = log_pred + log_adjustment
-        price = float(np.expm1(log_pred))
+    # XGBoost was trained on raw DataFrames, not scaled arrays.
+    log_pred  = float(model.predict(x)[0])
+    price     = float(np.expm1(log_pred))
 
     price_low  = round(price * 0.82, 2)
     price_high = round(price * 1.18, 2)

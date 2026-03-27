@@ -295,29 +295,36 @@ def add_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
 def encode_categoricals(
     df: pd.DataFrame,
     neighbourhood_mean_prices: Optional[Dict[str, float]] = None,
+    room_type_mean_prices: Optional[Dict[str, float]] = None,
     global_mean_log_price: float = 5.0,
     fit: bool = True,
 ) -> pd.DataFrame:
     """
     Encode categorical features:
-        - room_type → LabelEncoder (0-3)
-        - borough   → LabelEncoder (0-4)
+        - room_type  → target encoding (mean log_price per room type)
+        - borough    → LabelEncoder (0-4)
         - neighbourhood → target encoding (mean log_price per neighbourhood)
 
     Args:
         df:                        Input DataFrame
-        neighbourhood_mean_prices: Pre-computed mapping (use at inference time)
-        global_mean_log_price:     Fallback for unseen neighbourhoods
+        neighbourhood_mean_prices: Pre-computed neighbourhood mapping
+        room_type_mean_prices:     Pre-computed room type mapping
+        global_mean_log_price:     Fallback for unseen categories
         fit:                       If True, compute encoding from df (training).
-                                   If False, use provided neighbourhood_mean_prices.
     """
     from sklearn.preprocessing import LabelEncoder
 
     df = df.copy()
 
-    # Room type
-    le_room = LabelEncoder()
-    df["room_type_encoded"] = le_room.fit_transform(df["room_type"].fillna("Unknown"))
+    # Room type — target encoding (mean log_price per type)
+    if fit and "log_price" in df.columns:
+        rt_means = df.groupby("room_type")["log_price"].mean().to_dict()
+    elif room_type_mean_prices is not None:
+        rt_means = room_type_mean_prices
+    else:
+        rt_means = {}
+
+    df["room_type_encoded"] = df["room_type"].map(rt_means).fillna(global_mean_log_price)
 
     # Borough
     le_borough = LabelEncoder()
@@ -339,7 +346,7 @@ def encode_categoricals(
     )
 
     return df, {
-        "room_type_encoder": le_room,
+        "room_type_mean_prices": rt_means,
         "borough_encoder": le_borough,
         "neighbourhood_mean_prices": nbhd_means,
         "global_mean_log_price": global_mean_log_price,

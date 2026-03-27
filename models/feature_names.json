@@ -55,5 +55,11 @@
   ],
   "n_features": 52,
   "target": "log_price",
-  "transform": "log1p/expm1"
+  "transform": "log1p/expm1",
+  "room_type_mean_prices": {
+    "Entire home/apt": 5.348992801453218,
+    "Hotel room": 5.715659291730132,
+    "Private room": 4.556679818903923,
+    "Shared room": 4.288098275819825
+  }
 }

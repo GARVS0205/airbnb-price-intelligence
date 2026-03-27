@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import re
 import sqlite3
 import pandas as pd
 import json
@@ -80,11 +81,15 @@ def compute_analysis_features(rev_df, listing_id):
 
     samples = []
     for _, row in rev_df.head(5).iterrows():
-        text = str(row.get("comments", ""))
-        if text and len(text) > 5:
+        raw_text = str(row.get("comments", ""))
+        # Strip HTML tags (e.g. <br/>, <br>, &amp;, etc.) baked into raw CSV
+        clean_text = re.sub(r"<[^>]+>", " ", raw_text)          # remove tags
+        clean_text = re.sub(r"&[a-z]+;", " ", clean_text)       # remove HTML entities
+        clean_text = re.sub(r"\s{2,}", " ", clean_text).strip()  # collapse whitespace
+        if clean_text and len(clean_text) > 5:
             samples.append({
                 "date": str(row.get("date", ""))[:10],
-                "text": text[:400] + ("…" if len(text) > 400 else ""),
+                "text": clean_text[:400] + ("…" if len(clean_text) > 400 else ""),
             })
 
     return {

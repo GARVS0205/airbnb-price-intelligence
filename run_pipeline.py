@@ -400,11 +400,16 @@ df["luxury_x_capacity"] = df["premium_amenity_score"] * df["accommodates"]
 
 # Categorical encoding
 log("Encoding categorical features...")
-from sklearn.preprocessing import LabelEncoder
-le_room = LabelEncoder()
-df["room_type_encoded"] = le_room.fit_transform(df["room_type"].fillna("Unknown"))
+
+# Room type — target encoding using mean log_price per type
+# This gives XGBoost real price-correlated numeric values instead of arbitrary 0/1/2/3
+rt_means = df.groupby("room_type")["log_price"].mean()
+rt_means_dict = rt_means.to_dict()
+global_mean_log_price_rt = float(df["log_price"].mean())
+df["room_type_encoded"] = df["room_type"].map(rt_means_dict).fillna(global_mean_log_price_rt)
 
 if "neighbourhood_group_cleansed" in df.columns:
+    from sklearn.preprocessing import LabelEncoder
     le_borough = LabelEncoder()
     df["borough_encoded"] = le_borough.fit_transform(df["neighbourhood_group_cleansed"].fillna("Unknown"))
 else:
@@ -420,6 +425,7 @@ else:
     df["neighbourhood_target_encoded"] = df["log_price"].mean()
     nbhd_means_dict = {}
     global_mean_log_price = float(df["log_price"].mean())
+
 
 log("Feature engineering complete.")
 
@@ -577,7 +583,7 @@ log("  Saved scaler.pkl")
 
 # Encoders
 label_encoders = {
-    "room_type": le_room,
+    "room_type_mean_prices": rt_means_dict,
     "neighbourhood_mean_prices": nbhd_means_dict,
     "global_mean_log_price": global_mean_log_price,
 }
@@ -590,6 +596,7 @@ feat_meta = {
     "n_features": len(FEATURE_COLS),
     "target": "log_price",
     "transform": "log1p/expm1",
+    "room_type_mean_prices": rt_means_dict,
 }
 with open(os.path.join(MODELS_DIR, "feature_names.json"), "w") as f:
     json.dump(feat_meta, f, indent=2)
