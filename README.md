@@ -1,212 +1,154 @@
-# ListingLens — NYC Airbnb Price Intelligence
+<div align="center">
+  <img src="https://raw.githubusercontent.com/GARVS0205/airbnb-price-intelligence/main/public/logo.png" alt="ListingLens Logo" width="120" />
+  <h1>ListingLens — NYC Airbnb Price Intelligence</h1>
+  <p><strong>End-to-end Machine Learning Application for Short-Term Rental Pricing & NLP Review Analysis</strong></p>
 
-> An end-to-end machine learning application that estimates nightly Airbnb prices for any NYC property using XGBoost, NLP review sentiment analysis, and 52 engineered features trained on 20,700+ real listings.
+  [![Live Demo](https://img.shields.io/badge/Live%20Demo-listinglens--phi.vercel.app-blue?style=for-the-badge)](https://listinglens-phi.vercel.app)
+  [![Backend Health](https://img.shields.io/badge/Backend-Render-orange?style=for-the-badge)](https://listinglens-ru9r.onrender.com/health)
+  [![Model R²](https://img.shields.io/badge/Model%20R²-0.809-success?style=for-the-badge)](#model-performance)
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-listinglens--phi.vercel.app-blue?style=flat-square)](https://listinglens-phi.vercel.app)
-[![Backend](https://img.shields.io/badge/Backend-Render-orange?style=flat-square)](https://listinglens-ru9r.onrender.com/health)
-[![Model Accuracy](https://img.shields.io/badge/Model%20R²-0.809-green?style=flat-square)](https://listinglens-phi.vercel.app)
-
----
-
-## What It Does
-
-**ListingLens** is a full-stack AI tool for NYC Airbnb hosts and investors. Enter your listing details and get:
-
-- **Predicted nightly price** with confidence interval
-- **Borough comparison** — see how you stack up against similar listings
-- **Top price drivers** — understand which features most influence your price
-- **NLP review sentiment** — enter any Listing ID to have real guest reviews factored into the prediction
-- **Review Analysis** — inspect the sentiment, quality score, and topic themes of any NYC listing's reviews
+  <p>
+    An intelligent pricing tool that estimates nightly Airbnb rates for any NYC property using <b>XGBoost</b>, <b>NLP sentiment analysis</b>, and <b>52 engineered features</b> trained on 20,700+ real listings.
+  </p>
+</div>
 
 ---
 
-## Architecture
+## 🌟 Key Features
 
-This application uses a **split-stack architecture** because Vercel's serverless environment cannot run Python ML pipelines directly.
+- 🎯 **Accurate Nightly Pricing**: Predict prices with an XGBoost model (R² = 0.809) factoring in room type, location, amenities, and host quality.
+- 📊 **Feature Explainability**: Understand *why* a price was predicted. See the top features driving the price via SHAP-inspired impact weights.
+- 🧠 **NLP Guest Sentiment**: Integrate actual guest reviews. Enter an Airbnb Listing ID and the model will analyze review language (via VADER) to adjust the price estimate based on real quality signals.
+- 📈 **Review Dashboard**: A dedicated tool to explore sentiment distribution, review quality scores (0-100), and topic themes (e.g., cleanliness, location, host) for any NYC listing.
+- 📱 **Fully Responsive UI**: A modern, mobile-friendly interface built with Next.js 15, Recharts, and custom CSS variables.
 
-```
-User Browser
-     │
-     ▼
-┌─────────────────────────────────┐
-│  Vercel (Next.js 15)            │  ← Frontend + API Proxy
-│  listinglens-phi.vercel.app     │
-│                                 │
-│  /api/predict      ─────────────┼──┐
-│  /api/analyze-reviews ──────────┼──┤
-│  /api/ping (keep-alive) ────────┼──┤
-└─────────────────────────────────┘  │
-                                     ▼
-                    ┌─────────────────────────────────┐
-                    │  Render (Flask / Gunicorn)       │  ← Python ML Backend
-                    │  listinglens-ru9r.onrender.com  │
-                    │                                  │
-                    │  /predict → XGBoost inference    │
-                    │  /analyze-reviews → SQLite NLP   │
-                    │  /health  → uptime probe         │
-                    └─────────────────────────────────┘
+---
+
+## 🏗️ Architecture
+
+To circumvent Vercel's serverless size limits for large ML dependencies (like Scikit-Learn and Pandas), ListingLens utilizes a **split-stack architecture**:
+
+```mermaid
+graph TD
+    Client([User Browser]) -->|HTTP Requests| NextJS[Vercel Frontend]
+    
+    subgraph Frontend [Vercel - Serverless]
+        NextJS --> |/api/predict| Proxy1
+        NextJS --> |/api/analyze-reviews| Proxy2
+    end
+    
+    subgraph Backend [Render - Python]
+        Proxy1 ==>|Forward| Flask[Flask API]
+        Proxy2 ==>|Forward| Flask
+        Flask --> XGB[XGBoost Inference]
+        Flask --> SQLite[(Reviews SQLite DB)]
+    end
 ```
 
 | Layer | Technology | Platform |
 |---|---|---|
-| Frontend | Next.js 15, TypeScript, Recharts | Vercel |
-| Backend API | Python 3.12, Flask, Gunicorn | Render |
-| ML Model | XGBoost (R² = 0.809, 52 features) | Render |
-| NLP Database | SQLite precomputed from VaderSentiment | Render (82MB) |
-| Data Source | Inside Airbnb — NYC Nov 2025 (20,700+ listings) | — |
+| **Frontend** | Next.js 15, TypeScript, React, Recharts | Vercel |
+| **Backend API** | Python 3.12, Flask, Gunicorn | Render |
+| **ML Model** | XGBoost Regressor (0.809 R²), StandardScaler | Render |
+| **NLP Store** | Precomputed SQLite DB (VaderSentiment) | Render |
+| **Data Source** | Inside Airbnb — NYC Nov 2025 (20.7k listings)| — |
 
 ---
 
-## ML Pipeline
+## 🔬 Machine Learning Pipeline
 
-The model was trained using a full, reproducible pipeline (`run_pipeline.py`):
+The core ML engine was built with a reproducible pipeline (`run_pipeline.py`) structured in three phases:
 
-1. **Data Preprocessing** — clean prices, handle nulls, parse amenities
-2. **Feature Engineering** — 52 features across 7 categories:
-   - Location: neighbourhood target encoding, distances to landmarks, geo clusters
-   - Property: room type, capacity, beds/bathrooms, amenities
-   - Host: superhost status, response rate, experience, quality score
-   - Reviews: VADER sentiment, quality score, volume, recency
-   - Interaction terms: `luxury_x_capacity`, `capacity_x_bedrooms`, `reviews_x_score`
-   - NLP: precomputed from 500K+ reviews via `precompute_reviews.py`
-3. **Model Selection** — XGBoost vs Linear Regression vs Random Forest (XGBoost wins, R²=0.809)
-4. **Hyperparameter Tuning** — GridSearchCV on key XGBoost params
+### 1. Feature Engineering (52 total features)
+- **Geographic**: Target encoding for neighbourhoods, Haversine distances to 5 major NYC landmarks, and K-Means spatial clustering (8 clusters).
+- **Listing Details**: Room type, capacity, bedrooms, bathrooms, and boolean flags for premium amenities.
+- **NLP Sentiment**: Precomputed VADER sentiment metrics (positive/negative %) and a proprietary 100-point Review Quality Score.
+- **Interactions**: Engineered terms like `luxury_x_capacity` and `capacity_x_bedrooms`.
 
----
+### 2. Model Selection & Tuning
+- Tested Ridge Regression (Baseline), Random Forest, LightGBM, and XGBoost.
+- **XGBoost** performed best. Hyperparameters were optimized using `RandomizedSearchCV` across 100 fits (20 configs × 5-fold CV).
+- Prevented data leakage by splitting the train/test sets *before* applying neighborhood target encoding.
 
-## Project Structure
-
-```
-airbnb-price-intelligence/
-│
-├── app/                        # Next.js 15 Frontend + Python Backend
-│   ├── app/                    # App Router pages (/, /predict, /reviews)
-│   │   └── api/                # API proxy routes
-│   │       ├── predict/        # Forwards to Render /predict
-│   │       ├── analyze-reviews/# Forwards to Render /analyze-reviews
-│   │       └── ping/           # Keep-alive ping to prevent cold starts
-│   ├── components/             # React components
-│   │   ├── InputForm.tsx       # 37-feature listing form
-│   │   ├── PredictionDisplay.tsx # Results + borough chart + tips
-│   │   └── ReviewsDashboard.tsx  # Review sentiment explorer
-│   ├── models/                 # Trained model artifacts (tracked in git)
-│   │   ├── best_model.pkl      # XGBoost model (~1.5MB)
-│   │   ├── scaler.pkl          # StandardScaler
-│   │   ├── feature_names.json  # 52 feature names in order
-│   │   └── reviews_summary.db  # Precomputed VADER NLP SQLite (82MB)
-│   ├── server.py               # Flask API (3 routes: health/predict/analyze-reviews)
-│   ├── predict_api.py          # XGBoost inference + engineered feature reconstruction
-│   ├── review_analysis_api.py  # SQLite-based review NLP
-│   ├── precompute_reviews.py   # One-off script: CSV → SQLite DB
-│   └── vercel.json             # Vercel function timeout config (80s)
-│
-├── src/                        # ML pipeline source code
-│   ├── data_preprocessing.py   # Data cleaning + price parsing
-│   ├── feature_engineering.py  # 52 feature computation
-│   └── model_utils.py          # Training, evaluation utilities
-│
-├── data/                       # Data directory (raw CSVs excluded from git)
-│   └── raw/                    # listings.csv, reviews.csv (.gitignored, 400MB+)
-│
-├── run_pipeline.py             # End-to-end training pipeline
-├── requirements.txt            # Python dependencies
-└── README.md                   # This file
-```
+### 3. Model Performance
+| Metric | Result | Context |
+|---|---|---|
+| **R² Score** | `0.809` | The model explains ~81% of pricing variance. |
+| **MAPE** | `22.8%` | Average error margin (competitive for volatile real estate pricing). |
+| **Top Driver** | `Room Type` | Accounts for 43.5% of model gain importance. |
 
 ---
 
-## Local Development
+## 🛠️ Local Setup & Development
 
 ### Prerequisites
-- Python 3.10+
 - Node.js 18+
+- Python 3.10+
+- Git
 
-### Setup
+### Installation
 
-```bash
-# 1. Clone the repo
-git clone https://github.com/GARVS0205/airbnb-price-intelligence.git
-cd airbnb-price-intelligence
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/GARVS0205/airbnb-price-intelligence.git
+   cd airbnb-price-intelligence
+   ```
 
-# 2. Install Python dependencies
-pip install -r requirements.txt
+2. **Install Python dependencies:**
+   *(It is recommended to use a virtual environment)*
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-# 3. Run the Next.js frontend (development mode — uses local Python subprocess)
-cd app
-npm install
-npm run dev
+3. **Install Frontend dependencies & Run:**
+   ```bash
+   cd app
+   npm install
+   npm run dev
+   ```
+
+4. **View the app:**
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
+   > **Note:** In local development, the Next.js API automatically spawns a local Python subprocess to run inference. You do not need to run a separate Flask server locally.
+
+---
+
+## 🚀 Deployment Guide
+
+### 1. Backend (Render)
+- Create a new **Web Service** tied to the repository.
+- **Root Directory:** `app/`
+- **Build Command:** `pip install -r requirements.txt`
+- **Start Command:** `gunicorn -w 2 -b 0.0.0.0:$PORT server:app --timeout 120`
+
+### 2. Frontend (Vercel)
+- Import the repo into Vercel and set the **Root Directory** to `app/`.
+- Set Environment Variable:
+  - `PYTHON_API_URL` = `https://<your-render-app>.onrender.com`
+
+---
+
+## 📁 Repository Structure
+
+```text
+airbnb-price-intelligence/
+├── app/                        # Next.js Frontend & Python Backend Root
+│   ├── app/                    # React Pages & API Proxies (/predict, /reviews)
+│   ├── components/             # Reusable UI Components
+│   ├── models/                 # Serialized ML artifacts (.pkl, .json, .db)
+│   ├── server.py               # Production Flask production entry point
+│   ├── predict_api.py          # Inference script (called locally via subprocess)
+│   └── review_analysis_api.py  # NLP dashboard script
+├── src/                        # Machine Learning Source Code
+│   ├── data_preprocessing.py   # Cleaning & imputation
+│   └── feature_engineering.py  # Geographic & sentiment feature creation
+├── run_pipeline.py             # End-to-end model training script
+├── Project_Journey.md          # Complete documentation of the development process
+└── requirements.txt            # Python environment dependencies
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
-
-> **Note:** In development mode, the Next.js API routes spawn a local Python subprocess, so no separate Flask server is needed. The `PYTHON_API_URL` env variable is only required in production.
-
-### Environment Variables (Production / Vercel)
-
-| Variable | Value |
-|---|---|
-| `PYTHON_API_URL` | `https://listinglens-ru9r.onrender.com` |
-
 ---
 
-## Deployment
-
-### Frontend → Vercel
-
-1. Connect your GitHub repo to Vercel.
-2. Set **Root Directory** to `app/`.
-3. Add the `PYTHON_API_URL` environment variable.
-
-### Backend → Render
-
-1. Create a new **Web Service** on Render.
-2. Set build command: `pip install -r requirements.txt`
-3. Set start command: `gunicorn -w 2 -b 0.0.0.0:$PORT server:app --timeout 120`
-4. Root directory: `app/`
-
-### Keeping Render Alive (Recommended)
-
-Render's free tier spins down after 15 minutes of inactivity, causing a ~50s cold start.
-
-**To eliminate cold starts permanently:**
-1. Go to [cron-job.org](https://cron-job.org) (free account)
-2. Create a cron job: `GET https://listinglens-ru9r.onrender.com/health`
-3. Set interval: **every 5 minutes**
-
-This keeps the Render server always warm. No cold starts, no timeouts.
-
----
-
-## Model Performance
-
-| Metric | Value |
-|---|---|
-| R² Score | **0.809** |
-| RMSE | ~$38 |
-| Training samples | 20,700+ listings |
-| Features | 52 (including 6 NLP features) |
-| Algorithm | XGBoost (with StandardScaler) |
-
-**Top Price Drivers (XGBoost gain importance):**
-
-1. Room Type (43.5%)
-2. Guest Capacity (6.6%)
-3. Neighbourhood (5.0%)
-4. Luxury × Capacity interaction (4.9%)
-5. Accommodates² (4.5%)
-
----
-
-## Data
-
-- Source: [Inside Airbnb](http://insideairbnb.com) — NYC snapshot, November 2025
-- Raw CSV files are **excluded from git** (400MB+, see `.gitignore`)
-- Model artifacts and the precomputed SQLite DB are tracked and sufficient to run inference
-
----
-
-## Tech Stack
-
-**Backend Pipeline:** Python · XGBoost · scikit-learn · VaderSentiment · SQLite · Flask · Gunicorn  
-**Frontend:** Next.js 15 · TypeScript · Recharts · CSS Variables  
-**Infrastructure:** Vercel (frontend) · Render (Python ML API)
+<div align="center">
+  <p>Built with ❤️ for data science and web engineering.</p>
+</div>

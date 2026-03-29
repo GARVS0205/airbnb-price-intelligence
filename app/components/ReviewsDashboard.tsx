@@ -312,6 +312,9 @@ export default function ReviewsDashboard() {
             </div>
 
             {/* Breakdown */}
+            <div style={{ marginBottom: 16, fontSize: 13, color: "var(--text-muted)", background: "var(--surface-low)", padding: "10px 14px", borderRadius: 8 }}>
+              This <strong>100-point Quality Score</strong> evaluates how guests write about your property. It is composed of 4 key metrics:
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {[
                 { l: "Guest Sentiment",   hint: "How positive the language in reviews is",              v: result.quality_score.components.sentiment,  max: 40 },
@@ -325,7 +328,7 @@ export default function ReviewsDashboard() {
                       <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-secondary)" }}>{c.l}</span>
                       <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>{c.hint}</div>
                     </div>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--primary)", flexShrink: 0, marginTop: 2 }}>{c.v.toFixed(0)} / {c.max}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--primary)", flexShrink: 0, marginTop: 2 }}>{c.v.toFixed(0)} / {c.max} pts</span>
                   </div>
                   <div className="progress-track"><div className="progress-primary" style={{ width: `${(c.v / c.max) * 100}%` }} /></div>
                 </div>
