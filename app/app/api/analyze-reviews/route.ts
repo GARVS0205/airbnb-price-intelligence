@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { spawn } from "child_process";
 
-export const maxDuration = 80; // Allow enough time for Render cold-starts
-
+export const maxDuration = 300; // Match predict route to allow Render cold start locally
 /**
  * POST /api/analyze-reviews
  *
@@ -28,7 +27,7 @@ export async function POST(request: NextRequest) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ listing_id, max_reviews }),
-        signal: AbortSignal.timeout(70000),  // 70s — Render cold-start can take ~60s
+        signal: AbortSignal.timeout(170000),  // 170s — Render free tier cold-starts can be very slow
       });
       const data = await res.json();
       return NextResponse.json(data, { status: res.ok ? 200 : 500 });
