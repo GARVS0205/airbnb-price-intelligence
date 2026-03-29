@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ listing_id, max_reviews }),
-        signal: AbortSignal.timeout(28000),
+        signal: AbortSignal.timeout(70000),  // 70s — Render cold-start can take ~60s
       });
       const data = await res.json();
       return NextResponse.json(data, { status: res.ok ? 200 : 500 });

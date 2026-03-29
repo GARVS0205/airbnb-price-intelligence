@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import NavBar from "@/components/NavBar";
 
 const NAV = [
   { href: "/",        label: "About",           active: true  },
@@ -60,36 +61,18 @@ export default function AboutPage() {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-
-      {/* Header */}
-      <header style={{ background: "var(--surface)", borderBottom: "1px solid var(--ghost-border)", position: "sticky", top: 0, zIndex: 50 }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 32px", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#fff", letterSpacing: "-0.02em", boxShadow: "0 1px 4px rgba(37,99,235,0.25)" }}>LL</div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>ListingLens</span>
-          </a>
-          <nav style={{ display: "flex", alignItems: "center", gap: 2 }}>
-            {NAV.map(n => <a key={n.href} href={n.href} className={`nav-link ${n.active ? "active" : ""}`}>{n.label}</a>)}
-            <div style={{ width: 1, height: 16, background: "var(--ghost-border)", margin: "0 10px" }} />
-            <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="nav-link">GitHub</a>
-          </nav>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--success-dim)", borderRadius: 99, padding: "5px 12px" }}>
-            <span className="live-dot" />
-            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--success)" }}>Live</span>
-          </div>
-        </div>
-      </header>
+      <NavBar nav={NAV} />
 
       {/* Hero */}
       <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--ghost-border)" }}>
-        <div style={{ maxWidth: 800, margin: "0 auto", padding: "60px 32px 52px", textAlign: "center" }}>
-          <h1 className="page-title" style={{ fontSize: 40, marginBottom: 16 }}>
+        <div className="page-pad hero-section" style={{ maxWidth: 800, margin: "0 auto", paddingTop: 60, paddingBottom: 52, textAlign: "center" }}>
+          <h1 className="page-title" style={{ marginBottom: 16 }}>
             Know exactly what your Airbnb listing should cost tonight.
           </h1>
           <p style={{ fontSize: 16, color: "var(--text-muted)", lineHeight: 1.75, maxWidth: 560, margin: "0 auto 36px" }}>
             ListingLens analyses thousands of real NYC Airbnb listings, including guest reviews, to give you a smart, data-driven nightly price estimate for any property in New York City.
           </p>
-          <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+          <div className="hero-btns">
             <a href="/predict" className="btn btn-primary" style={{ padding: "11px 26px", fontSize: 14 }}>Try the Price Estimator</a>
             <a href="/reviews" className="btn btn-secondary" style={{ padding: "11px 26px", fontSize: 14 }}>Explore Review Analysis</a>
           </div>
@@ -97,7 +80,7 @@ export default function AboutPage() {
       </div>
 
       <main style={{ flex: 1, background: "var(--bg)" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "52px 32px 80px", display: "flex", flexDirection: "column", gap: 56 }}>
+        <div className="page-pad" style={{ maxWidth: 1100, margin: "0 auto", paddingTop: 52, paddingBottom: 80, display: "flex", flexDirection: "column", gap: 56 }}>
 
           {/* What it does */}
           <section>
@@ -105,7 +88,7 @@ export default function AboutPage() {
             <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginBottom: 24, lineHeight: 1.65 }}>
               Two tools. One goal: help you price smarter.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="grid-2">
               {WHAT_IT_DOES.map(w => (
                 <div key={w.title} className="card">
                   <div style={{ padding: "22px 26px" }}>
@@ -123,7 +106,7 @@ export default function AboutPage() {
             <p style={{ fontSize: 13.5, color: "var(--text-muted)", marginBottom: 24, lineHeight: 1.65 }}>
               ListingLens is built for anyone making decisions about NYC short-term rental pricing.
             </p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="grid-2">
               {FOR_WHOM.map(f => (
                 <div key={f.audience} className="card">
                   <div style={{ padding: "22px 26px" }}>
@@ -152,7 +135,7 @@ export default function AboutPage() {
             </div>
 
             {flowOpen && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div className="grid-2">
                 {USER_FLOW.map(step => (
                   <div key={step.n} className="card">
                     <div style={{ padding: "18px 22px", display: "flex", gap: 14 }}>
@@ -171,8 +154,8 @@ export default function AboutPage() {
         </div>
       </main>
 
-      <footer style={{ background: "var(--surface)", borderTop: "1px solid var(--ghost-border)", padding: "20px 32px" }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--text-muted)" }}>
+      <footer style={{ background: "var(--surface)", borderTop: "1px solid var(--ghost-border)", padding: "20px 0" }}>
+        <div className="page-pad footer-inner" style={{ maxWidth: 1200, margin: "0 auto" }}>
           <span>ListingLens — NYC Airbnb Price Intelligence</span>
           <span>Data: <a href="http://insideairbnb.com" style={{ color: "var(--primary)", textDecoration: "none" }}>Inside Airbnb</a> · Nov 2025</span>
         </div>

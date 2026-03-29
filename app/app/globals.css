@@ -400,4 +400,145 @@ tr.best-row td { color: var(--text-primary); font-weight: 500; }
 /* ─────────────────────────────────────────────────────────
    DIVIDER — tonal gutter approach
 ───────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────
+   DIVIDER — tonal gutter approach
+───────────────────────────────────────────────────────── */
 .divider { height: 1px; background: var(--ghost-border); }
+
+/* ─────────────────────────────────────────────────────────
+   RESPONSIVE — MOBILE FIRST
+   Breakpoints: sm=480px, md=768px, lg=1024px
+───────────────────────────────────────────────────────── */
+
+/* Nav: mobile hamburger */
+.nav-hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  transition: background 0.12s;
+}
+.nav-hamburger:hover { background: var(--surface-low); }
+
+.nav-menu {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Mobile nav drawer */
+.nav-drawer {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 16px 12px;
+  border-top: 1px solid var(--ghost-border);
+  background: var(--surface);
+}
+.nav-drawer.open { display: flex; }
+.nav-drawer .nav-link { width: 100%; padding: 10px 14px; }
+
+/* Responsive page padding */
+.page-pad {
+  padding-left: 32px;
+  padding-right: 32px;
+}
+
+/* Two-column grids that collapse on mobile */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Sidebar layout: sidebar + content */
+.sidebar-layout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* Hero CTA buttons */
+.hero-btns {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Footer flex */
+.footer-inner {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── @media sm — tablets / large phones ── */
+@media (max-width: 768px) {
+  body { font-size: 13px; }
+
+  .nav-hamburger { display: flex; align-items: center; justify-content: center; }
+  .nav-menu { display: none; }
+
+  .page-pad {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .page-title { font-size: 26px !important; }
+  .price-mono { font-size: 40px; }
+  .stat-value { font-size: 22px; }
+
+  .grid-2 {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .sidebar-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-btns {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .hero-btns .btn { text-align: center; }
+
+  .footer-inner {
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    text-align: center;
+  }
+
+  /* Fix card headers that use space-between */
+  .card-header { flex-wrap: wrap; gap: 8px; }
+
+  /* Wider touch targets for checkboxes */
+  input[type=checkbox] { width: 18px; height: 18px; }
+  input[type=range] { height: 5px; }
+  input[type=range]::-webkit-slider-thumb { width: 20px; height: 20px; }
+}
+
+/* ── @media xs — small phones ── */
+@media (max-width: 480px) {
+  .page-title { font-size: 22px !important; }
+  .section-title { font-size: 16px; }
+  .price-mono { font-size: 36px; }
+
+  .page-pad {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  /* hero has less vertical breathing room */
+  .hero-section {
+    padding-top: 36px !important;
+    padding-bottom: 28px !important;
+  }
+}
