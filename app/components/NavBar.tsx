@@ -38,7 +38,7 @@ export default function NavBar({ nav, showModelLive = false }: NavBarProps) {
 
             {/* Right side: live badge + hamburger */}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--success-dim)", borderRadius: 99, padding: "5px 12px" }}>
+              <div className="nav-live-badge" style={{ display: "flex", alignItems: "center", gap: 7, background: "var(--success-dim)", borderRadius: 99, padding: "5px 12px" }}>
                 <span className="live-dot" />
                 <span style={{ fontSize: 12, fontWeight: 500, color: "var(--success)" }}>{showModelLive ? "Model live" : "Live"}</span>
               </div>

@@ -541,4 +541,7 @@ tr.best-row td { color: var(--text-primary); font-weight: 500; }
     padding-top: 36px !important;
     padding-bottom: 28px !important;
   }
+
+  /* hide live badge on very small nav bars to prevent overflow */
+  .nav-live-badge { display: none !important; }
 }
