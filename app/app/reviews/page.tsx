@@ -1,4 +1,5 @@
 "use client";
+import { useEffect } from "react";
 import ReviewsDashboard from "../../components/ReviewsDashboard";
 import NavBar from "@/components/NavBar";
 
@@ -9,6 +10,11 @@ const NAV = [
 ];
 
 export default function ReviewsPage() {
+  // Pre-warm the backend as soon as the page loads
+  useEffect(() => {
+    fetch("/api/ping", { method: "GET" }).catch(() => {});
+  }, []);
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <NavBar nav={NAV} showModelLive />
@@ -38,3 +44,4 @@ export default function ReviewsPage() {
     </div>
   );
 }
+

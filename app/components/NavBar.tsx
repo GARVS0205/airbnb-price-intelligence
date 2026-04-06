@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 interface NavItem {
   href: string;
@@ -14,8 +14,20 @@ interface NavBarProps {
 
 const GITHUB_URL = "https://github.com/GARVS0205/airbnb-price-intelligence";
 
+/** Pages that use the ML backend — hovering these triggers a pre-warm ping */
+const ML_PAGES = ["/predict", "/reviews"];
+
 export default function NavBar({ nav, showModelLive = false }: NavBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const pingFiredRef = useRef(false); // fire at most once per NavBar mount
+
+  const handleNavHover = (href: string) => {
+    if (!ML_PAGES.includes(href)) return;
+    if (pingFiredRef.current) return; // already pinged
+    pingFiredRef.current = true;
+    // Fire-and-forget — we don't need the result here
+    fetch("/api/ping", { method: "GET" }).catch(() => {});
+  };
 
   return (
     <>
@@ -31,7 +43,16 @@ export default function NavBar({ nav, showModelLive = false }: NavBarProps) {
 
             {/* Desktop nav */}
             <nav className="nav-menu">
-              {nav.map(n => <a key={n.href} href={n.href} className={`nav-link ${n.active ? "active" : ""}`}>{n.label}</a>)}
+              {nav.map(n => (
+                <a
+                  key={n.href}
+                  href={n.href}
+                  className={`nav-link ${n.active ? "active" : ""}`}
+                  onMouseEnter={() => handleNavHover(n.href)}
+                >
+                  {n.label}
+                </a>
+              ))}
               <div style={{ width: 1, height: 16, background: "var(--ghost-border)", margin: "0 10px" }} />
               <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="nav-link">GitHub</a>
             </nav>
@@ -60,7 +81,13 @@ export default function NavBar({ nav, showModelLive = false }: NavBarProps) {
           {/* Mobile dropdown drawer */}
           <div className={`nav-drawer ${menuOpen ? "open" : ""}`}>
             {nav.map(n => (
-              <a key={n.href} href={n.href} className={`nav-link ${n.active ? "active" : ""}`} onClick={() => setMenuOpen(false)}>
+              <a
+                key={n.href}
+                href={n.href}
+                className={`nav-link ${n.active ? "active" : ""}`}
+                onClick={() => setMenuOpen(false)}
+                onTouchStart={() => handleNavHover(n.href)}
+              >
                 {n.label}
               </a>
             ))}
@@ -73,3 +100,4 @@ export default function NavBar({ nav, showModelLive = false }: NavBarProps) {
     </>
   );
 }
+
