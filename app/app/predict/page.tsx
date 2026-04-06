@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import InputForm from "@/components/InputForm";
 import PredictionDisplay from "@/components/PredictionDisplay";
 import NavBar from "@/components/NavBar";
@@ -18,12 +18,18 @@ export default function PredictPage() {
   const [errorDetails, setErrorDetails] = useState<string[]>([]);
   const [formData, setFormData]     = useState<FormData | null>(null);
   const [backendWarm, setBackendWarm] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<"warming" | "warm" | "cold">("warming");
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   // Silently wake up the Render backend when the page loads
   useEffect(() => {
     fetch("/api/ping", { method: "GET" })
-      .then(() => setBackendWarm(true))
-      .catch(() => setBackendWarm(true)); // still mark warm even if ping fails
+      .then(r => r.json())
+      .then(d => {
+        setBackendWarm(true);
+        setBackendStatus(d.status === "warm" ? "warm" : "cold");
+      })
+      .catch(() => { setBackendWarm(true); setBackendStatus("cold"); });
   }, []);
 
   const handlePredict = async (data: FormData) => {
@@ -38,8 +44,15 @@ export default function PredictPage() {
         throw new Error(json.error || "Prediction failed");
       }
       setPrediction(json);
+      // Scroll to results on mobile after a short delay (DOM update)
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 80);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Unknown error");
+      setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 80);
     } finally { setLoading(false); }
   };
 
@@ -60,6 +73,19 @@ export default function PredictPage() {
 
       <main style={{ flex: 1, background: "var(--bg)" }}>
         <div className="page-pad" style={{ maxWidth: 1200, margin: "0 auto", paddingTop: 32, paddingBottom: 64 }}>
+          {/* Backend warm-up hint */}
+          {backendStatus === "cold" && !loading && (
+            <div style={{ marginBottom: 16, padding: "10px 16px", borderRadius: 8, background: "var(--warning-dim)", fontSize: 12, color: "var(--warning)", display: "flex", alignItems: "center", gap: 8 }}>
+              <span>⚡</span>
+              <span>ML backend is warming up — first prediction may take 30–60 seconds. Subsequent requests will be fast.</span>
+            </div>
+          )}
+          {loading && (
+            <div style={{ marginBottom: 16, padding: "10px 16px", borderRadius: 8, background: "var(--primary-dim)", fontSize: 12, color: "var(--primary)", display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="spinner" style={{ borderColor: "rgba(37,99,235,0.3)", borderTopColor: "var(--primary)" }} />
+              <span>Running ML inference… this may take up to 60 seconds on first use.</span>
+            </div>
+          )}
           <div className="sidebar-layout">
             <div className="card">
               <div className="card-header">
@@ -68,7 +94,7 @@ export default function PredictPage() {
               <InputForm onSubmit={handlePredict} loading={loading} />
             </div>
 
-            <div>
+            <div ref={resultsRef}>
               {error && (
                 <div style={{ padding: "14px 18px", borderRadius: 10, background: "var(--error-dim)", marginBottom: 16 }}>
                   <p style={{ fontSize: 13, color: "var(--error)", fontWeight: 500 }}>{error}</p>
@@ -84,7 +110,7 @@ export default function PredictPage() {
               {prediction ? (
                 <PredictionDisplay prediction={prediction} formData={formData} />
               ) : (
-                <div className="card" style={{ padding: "64px 32px", textAlign: "center" }}>
+                <div className="card" style={{ padding: "48px 24px", textAlign: "center" }}>
                   <div style={{ width: 48, height: 48, borderRadius: 12, background: "var(--surface-low)", margin: "0 auto 20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.5">
                       <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />

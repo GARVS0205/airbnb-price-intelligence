@@ -41,6 +41,7 @@ export default function InputForm({ onSubmit, loading }: Props) {
   const [listingId, setListingId] = useState("");
   const [nbhd, setNbhd]   = useState(NEIGHBOURHOODS[0]);
   const [rt,   setRt]     = useState(ROOM_TYPES[0]);
+  const [hostExp, setHostExp] = useState(365);
   const [f, setF] = useState({
     accommodates: 2, bedrooms: 1, bathrooms: 1, beds: 1,
     amenity_count: 25, review_scores_rating: 4.7, number_of_reviews: 50,
@@ -74,6 +75,7 @@ export default function InputForm({ onSubmit, loading }: Props) {
       has_workspace: f.has_workspace?1:0,
       is_superhost: f.is_superhost?1:0,
       host_response_rate: f.host_response_rate, host_acceptance_rate: 0.85,
+      host_experience_days: hostExp,
       calculated_host_listings_count: 1,
       number_of_reviews: f.number_of_reviews,
       review_scores_rating: f.review_scores_rating,
@@ -110,13 +112,13 @@ export default function InputForm({ onSubmit, loading }: Props) {
         />
         {listingId && (
           <p style={{ fontSize: 11, color: "var(--primary)", marginTop: 6, fontWeight: 500 }}>
-            NLP active, prediction will use real review sentiment
+            ✓ NLP active — prediction will use real review sentiment
           </p>
         )}
       </div>
 
       {/* Location */}
-      <div style={{ padding: "20px 20px 16px" }}>
+      <div style={{ padding: "16px 20px" }}>
         <Section title="Location" />
         <Label text="Neighborhood" />
         <select className="input" value={nbhd.v}
@@ -130,14 +132,15 @@ export default function InputForm({ onSubmit, loading }: Props) {
       {/* Property */}
       <div style={{ padding: "16px 20px" }}>
         <Section title="Property" />
-        <div style={{ marginBottom: 10 }}>
+        <div style={{ marginBottom: 12 }}>
           <Label text="Room type" />
           <select className="input" value={rt.value}
             onChange={e => { const r = ROOM_TYPES.find(x => x.value === parseInt(e.target.value)); if (r) setRt(r); }}>
             {ROOM_TYPES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {/* 2-col on all screen sizes, each field is a comfortable touch target */}
+        <div className="form-grid-2">
           {([["accommodates","Guests"],["bedrooms","Bedrooms"],["bathrooms","Bathrooms"],["beds","Beds"]] as [keyof typeof f, string][]).map(([k,l]) => (
             <div key={k}>
               <Label text={l} />
@@ -154,16 +157,24 @@ export default function InputForm({ onSubmit, loading }: Props) {
       {/* Amenities */}
       <div style={{ padding: "16px 20px" }}>
         <Section title="Amenities" />
-        <Label text={`Total count: ${f.amenity_count}`} />
-        <input type="range" min="0" max="80" style={{ marginBottom: 12 }}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <Label text="Total count" />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>{f.amenity_count}</span>
+        </div>
+        <input type="range" min="0" max="80" style={{ marginBottom: 14 }}
           value={f.amenity_count} onChange={e => s("amenity_count", parseInt(e.target.value))} />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "7px 16px" }}>
+        <div className="amenity-grid">
           {([
-            ["has_pool","Pool"],["has_gym","Gym"],["has_parking","Parking"],
-            ["has_elevator","Elevator"],["has_washer","Washer/Dryer"],["has_ac","Air Conditioning"],
-            ["has_workspace","Workspace"],["has_luxury_keywords","Luxury listing"],
+            ["has_ac","🌡 Air Conditioning"],["has_workspace","💼 Workspace"],
+            ["has_washer","🫧 Washer/Dryer"],["has_elevator","🛗 Elevator"],
+            ["has_pool","🏊 Pool"],["has_gym","🏋 Gym"],
+            ["has_parking","🅿 Parking"],["has_luxury_keywords","✨ Luxury"],
           ] as [keyof typeof f, string][]).map(([k,l]) => (
-            <Check key={k} label={l} checked={!!f[k]} onChange={v => s(k, v)} />
+            <label key={k} className={`amenity-chip${f[k] ? " amenity-chip-active" : ""}`}>
+              <input type="checkbox" checked={!!f[k]} onChange={e => s(k, e.target.checked)}
+                style={{ position: "absolute", opacity: 0, width: 0, height: 0 }} />
+              <span>{l}</span>
+            </label>
           ))}
         </div>
       </div>
@@ -173,7 +184,7 @@ export default function InputForm({ onSubmit, loading }: Props) {
       {/* Host & Reviews */}
       <div style={{ padding: "16px 20px 20px" }}>
         <Section title="Host & Reviews" />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+        <div className="form-grid-2" style={{ marginBottom: 12 }}>
           <div>
             <Label text="Review score (0–5)" />
             <input type="number" min="0" max="5" step="0.1" className="input"
@@ -185,10 +196,25 @@ export default function InputForm({ onSubmit, loading }: Props) {
               value={f.number_of_reviews} onChange={e => s("number_of_reviews", parseInt(e.target.value))} />
           </div>
         </div>
-        <Label text={`Host response rate: ${(f.host_response_rate * 100).toFixed(0)}%`} />
-        <input type="range" min="0" max="1" step="0.01" style={{ marginBottom: 12 }}
-          value={f.host_response_rate} onChange={e => s("host_response_rate", parseFloat(e.target.value))} />
-        <div style={{ display: "flex", gap: 16 }}>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <Label text="Host response rate" />
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>{(f.host_response_rate * 100).toFixed(0)}%</span>
+          </div>
+          <input type="range" min="0" max="1" step="0.01"
+            value={f.host_response_rate} onChange={e => s("host_response_rate", parseFloat(e.target.value))} />
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <Label text="Host experience" />
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>
+              {hostExp >= 730 ? `${(hostExp/365).toFixed(0)} yrs` : `${hostExp} days`}
+            </span>
+          </div>
+          <input type="range" min="0" max="3650" step="30"
+            value={hostExp} onChange={e => setHostExp(parseInt(e.target.value))} />
+        </div>
+        <div className="form-grid-2" style={{ gap: "10px 20px" }}>
           <Check label="Superhost" checked={f.is_superhost} onChange={v => s("is_superhost", v)} />
           <Check label="Instant Book" checked={f.instant_bookable} onChange={v => s("instant_bookable", v)} />
         </div>
@@ -196,9 +222,9 @@ export default function InputForm({ onSubmit, loading }: Props) {
 
       <div className="divider" />
 
-      <div style={{ padding: 16 }}>
-        <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: "100%", height: 42, fontSize: 13.5 }}>
-          {loading ? <><span className="spinner" />Running prediction…</> : "Run Price Prediction"}
+      <div style={{ padding: "14px 16px" }}>
+        <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: "100%", height: 46, fontSize: 14, fontWeight: 600 }}>
+          {loading ? <><span className="spinner" />Running prediction…</> : "Get Price Estimate →"}
         </button>
       </div>
     </form>

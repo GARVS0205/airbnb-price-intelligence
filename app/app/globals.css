@@ -545,3 +545,66 @@ tr.best-row td { color: var(--text-primary); font-weight: 500; }
   /* hide live badge on very small nav bars to prevent overflow */
   .nav-live-badge { display: none !important; }
 }
+
+/* ─────────────────────────────────────────────────────────
+   FORM GRID — 2-col that collapses to 2-col on mobile too
+   (inputs are compact enough to stay side-by-side)
+───────────────────────────────────────────────────────── */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* ─────────────────────────────────────────────────────────
+   AMENITY CHIPS — pill-style toggle (much easier on mobile)
+───────────────────────────────────────────────────────── */
+.amenity-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.amenity-chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--surface-low);
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+  transition: all 0.15s;
+  user-select: none;
+  min-height: 40px;
+}
+
+.amenity-chip:hover {
+  background: var(--surface-high);
+  color: var(--text-primary);
+}
+
+.amenity-chip-active {
+  background: var(--primary-dim);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+@media (max-width: 480px) {
+  .amenity-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .amenity-chip {
+    padding: 10px 8px;
+    font-size: 11.5px;
+  }
+  .form-grid-2 {
+    gap: 6px;
+  }
+}

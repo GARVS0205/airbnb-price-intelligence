@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { spawn } from "child_process";
 
-export const maxDuration = 300; // Give Render enough time (up to 300s) locally
+export const maxDuration = 60; // Vercel Hobby plan max is 60s
 
 /**
  * POST /api/predict
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(features),
-        signal: AbortSignal.timeout(170000),  // 170s — Render free tier cold-starts can be very slow
+        signal: AbortSignal.timeout(55_000),  // 55s — leaves 5s headroom for Vercel's 60s limit
       });
       const data = await res.json();
       return NextResponse.json(data, { status: res.ok ? 200 : 500 });

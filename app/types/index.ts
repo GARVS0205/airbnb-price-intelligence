@@ -44,6 +44,7 @@ export interface FormData {
   is_superhost?: number;
   host_response_rate?: number;
   host_acceptance_rate?: number;
+  host_experience_days?: number;
   calculated_host_listings_count?: number;
 
   // Reviews
