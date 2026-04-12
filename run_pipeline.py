@@ -457,6 +457,70 @@ CANDIDATE_FEATURES = [
 FEATURE_COLS = [c for c in CANDIDATE_FEATURES if c in df.columns]
 log(f"Feature columns: {len(FEATURE_COLS)}")
 
+# ── Monotonicity constraints (matched to CANDIDATE_FEATURES order) ──────────
+# +1 = feature must increase prediction monotonically
+#  0 = no constraint (complex / categorical / uncertain)
+# -1 = feature must decrease prediction monotonically
+FEATURE_MONOTONE_CONSTRAINTS = {
+    "neighbourhood_target_encoded":  1,   # higher neighbourhood mean → higher price
+    "borough_encoded":               0,   # categorical
+    "latitude":                      0,   # geographic — non-monotonic
+    "longitude":                     0,   # geographic — non-monotonic
+    "room_type_encoded":             1,   # higher target-encoded value → higher price
+    "accommodates":                  1,   # more guests → higher price
+    "accommodates_sq":               1,   # derived from accommodates
+    "bedrooms":                      1,   # more bedrooms → higher price
+    "bathrooms":                     1,   # more bathrooms → higher price
+    "beds":                          1,   # more beds → higher price
+    "beds_per_person":               0,   # complex
+    "availability_rate":             0,   # complex (low availability = popular, not always cheaper)
+    "dist_times_square_km":         -1,   # farther from Times Square → lower price
+    "dist_central_park_km":         -1,   # farther from Central Park → lower price
+    "dist_jfk_airport_km":           0,   # ambiguous
+    "dist_brooklyn_bridge_km":       0,   # ambiguous
+    "dist_grand_central_km":        -1,   # farther from Grand Central → lower price
+    "geo_cluster":                   0,   # categorical
+    "amenity_count":                 1,   # more amenities → higher price
+    "premium_amenity_score":         1,   # better amenities → higher price
+    "has_pool":                      1,
+    "has_gym":                       1,
+    "has_parking":                   1,
+    "has_elevator":                  1,
+    "has_washer":                    1,
+    "has_ac":                        1,
+    "has_workspace":                 1,
+    "has_doorman":                   1,
+    "is_superhost":                  1,   # superhost → higher price
+    "host_quality_score":            1,   # better host → higher price
+    "host_experience_years":         1,   # more experience → higher price
+    "is_professional_host":          0,   # ambiguous
+    "log_number_of_reviews":         1,   # KEY FIX: more reviews → higher or equal price
+    "has_reviews":                   1,   # having reviews → higher price
+    "reviews_per_month":             1,   # more frequent reviews → higher price
+    "composite_review_score":        1,   # better score → higher price
+    "review_recency_bucket":         0,   # complex
+    "reviews_x_score":               1,   # log_reviews × score — both positive
+    "capacity_x_bedrooms":           1,   # more capacity × bedrooms → higher price
+    "luxury_x_capacity":             1,   # more luxury × capacity → higher price
+    "desc_word_count":               0,   # longer desc doesn't always = higher price
+    "desc_sentiment":                1,   # more positive description → higher price
+    "has_luxury_keywords":           1,
+    "has_cozy_keywords":             0,   # cozy ≠ expensive
+    "has_spacious_keywords":         1,
+    "has_renovated_keywords":        1,
+    "review_avg_sentiment":          1,   # more positive reviews → higher price
+    "review_positive_pct":           1,
+    "review_negative_pct":          -1,   # more negative reviews → lower price
+    "review_avg_word_count":         0,   # complex
+    "review_quality_score":          1,   # higher quality score → higher price
+    "review_sentiment_trend":        1,   # improving sentiment → higher price
+}
+# Build the constraints tuple in FEATURE_COLS order (handles missing features safely)
+MONOTONE_CONSTRAINTS = tuple(FEATURE_MONOTONE_CONSTRAINTS.get(f, 0) for f in FEATURE_COLS)
+log(f"Monotone constraints: {sum(1 for c in MONOTONE_CONSTRAINTS if c==1)} positive, "
+    f"{sum(1 for c in MONOTONE_CONSTRAINTS if c==-1)} negative, "
+    f"{sum(1 for c in MONOTONE_CONSTRAINTS if c==0)} unconstrained")
+
 # Save engineered dataset
 df[FEATURE_COLS + ["log_price", "price"]].to_csv(
     os.path.join(PROC_DIR, "listings_features.csv"), index=False
@@ -516,11 +580,12 @@ r, m = eval_model(
 )
 results.append(r)
 
-log("Training XGBoost (initial)...")
+log("Training XGBoost (initial, with monotone constraints)...")
 xgb_init = xgb.XGBRegressor(
     n_estimators=400, learning_rate=0.05, max_depth=6,
     subsample=0.8, colsample_bytree=0.7, min_child_weight=5,
     reg_alpha=0.1, reg_lambda=1.0,
+    monotone_constraints=MONOTONE_CONSTRAINTS,
     n_jobs=-1, random_state=42, verbosity=0
 )
 r, m = eval_model(xgb_init, X_train, X_test, y_train, y_test, "XGBoost (initial)")
@@ -555,7 +620,10 @@ param_dist = {
     "reg_lambda":       [0.5, 1.0, 2.0],
 }
 search = RandomizedSearchCV(
-    xgb.XGBRegressor(n_jobs=-1, random_state=42, verbosity=0),
+    xgb.XGBRegressor(
+        n_jobs=-1, random_state=42, verbosity=0,
+        monotone_constraints=MONOTONE_CONSTRAINTS,   # enforce intuitive relationships
+    ),
     param_distributions=param_dist, n_iter=20, cv=5,
     scoring="r2", n_jobs=-1, random_state=42, verbose=0
 )
@@ -623,6 +691,24 @@ log("  Saved model_metadata.json")
 df_save = df[[c for c in df.columns if c != "amenities_parsed"]].copy()
 df_save.to_csv(os.path.join(PROC_DIR, "listings_clean.csv"), index=False)
 log("  Saved listings_clean.csv")
+
+# ── Auto-export model.json for TypeScript inference ──────────────────────────
+log("Exporting model.json for TypeScript XGBoost inference...")
+try:
+    import re as _re
+    booster = best_model.get_booster()
+    _orig_names = booster.feature_names
+    _orig_types = booster.feature_types
+    booster.feature_names = None   # onnxmltools requires 'f0..fn' names
+    booster.feature_types = None
+    booster.save_model(os.path.join(MODELS_DIR, "model_root.json"))  # root models/
+    booster.save_model(os.path.join(BASE_DIR, "app", "models", "model.json"))  # app/models/
+    booster.feature_names = _orig_names
+    booster.feature_types = _orig_types
+    size_mb = os.path.getsize(os.path.join(BASE_DIR, "app", "models", "model.json")) / 1e6
+    log(f"  Saved app/models/model.json ({size_mb:.1f} MB) — ready for Vercel deployment")
+except Exception as _e:
+    log(f"  model.json export failed (non-fatal): {_e}. Run convert_model_to_onnx.py manually.")
 
 # ─────────────────────────────────────────────────────────────
 # DONE
