@@ -1,10 +1,9 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/GARVS0205/airbnb-price-intelligence/main/public/logo.png" alt="ListingLens Logo" width="120" />
   <h1>ListingLens — NYC Airbnb Price Intelligence</h1>
   <p><strong>End-to-end Machine Learning Application for Short-Term Rental Pricing & NLP Review Analysis</strong></p>
 
   [![Live Demo](https://img.shields.io/badge/Live%20Demo-listinglens--phi.vercel.app-blue?style=for-the-badge)](https://listinglens-phi.vercel.app)
-  [![Backend Health](https://img.shields.io/badge/Backend-Render-orange?style=for-the-badge)](https://listinglens-ru9r.onrender.com/health)
+  [![Deployed on](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com)
   [![Model R²](https://img.shields.io/badge/Model%20R²-0.809-success?style=for-the-badge)](#model-performance)
 
   <p>
@@ -21,37 +20,32 @@
 - 🧠 **NLP Guest Sentiment**: Integrate actual guest reviews. Enter an Airbnb Listing ID and the model will analyze review language (via VADER) to adjust the price estimate based on real quality signals.
 - 📈 **Review Dashboard**: A dedicated tool to explore sentiment distribution, review quality scores (0-100), and topic themes (e.g., cleanliness, location, host) for any NYC listing.
 - 📱 **Fully Responsive UI**: A modern, mobile-friendly interface built with Next.js 15, Recharts, and custom CSS variables.
+- ⚡ **Instant Predictions**: ML inference runs directly on Vercel via a pure TypeScript XGBoost tree-walker — no cold starts, no external backend.
 
 ---
 
 ## 🏗️ Architecture
 
-To circumvent Vercel's serverless size limits for large ML dependencies (like Scikit-Learn and Pandas), ListingLens utilizes a **split-stack architecture**:
+ListingLens runs **entirely on Vercel** with zero external backend dependencies. The XGBoost model is converted to its native JSON format and inference is performed by a pure TypeScript decision-tree walker — no Python, no native binaries, no cold starts.
 
 ```mermaid
 graph TD
-    Client([User Browser]) -->|HTTP Requests| NextJS[Vercel Frontend]
-    
-    subgraph Frontend [Vercel - Serverless]
-        NextJS --> |/api/predict| Proxy1
-        NextJS --> |/api/analyze-reviews| Proxy2
-    end
-    
-    subgraph Backend [Render - Python]
-        Proxy1 ==>|Forward| Flask[Flask API]
-        Proxy2 ==>|Forward| Flask
-        Flask --> XGB[XGBoost Inference]
-        Flask --> SQLite[(Reviews SQLite DB)]
+    Client([User Browser]) -->|HTTP| Vercel[Vercel Edge]
+
+    subgraph Vercel ["Vercel — Single Platform"]
+        Vercel --> NextJS[Next.js Frontend]
+        NextJS -->|/api/predict| PredictFn["TypeScript XGBoost\n(tree walker, model.json)"]
+        NextJS -->|/api/analyze-reviews| ReviewsFn["better-sqlite3\n(reviews_summary.db)"]
     end
 ```
 
 | Layer | Technology | Platform |
 |---|---|---|
 | **Frontend** | Next.js 15, TypeScript, React, Recharts | Vercel |
-| **Backend API** | Python 3.12, Flask, Gunicorn | Render |
-| **ML Model** | XGBoost Regressor (0.809 R²), StandardScaler | Render |
-| **NLP Store** | Precomputed SQLite DB (VaderSentiment) | Render |
-| **Data Source** | Inside Airbnb — NYC Nov 2025 (20.7k listings)| — |
+| **ML Inference** | Pure TypeScript XGBoost tree-walker | Vercel (serverless function) |
+| **Model** | XGBoost JSON (700 trees, 52 features, R²=0.809) | Bundled in deployment |
+| **Review Data** | Precomputed SQLite DB (better-sqlite3) | Bundled in deployment |
+| **Data Source** | Inside Airbnb — NYC Nov 2025 (20.7k listings) | — |
 
 ---
 
@@ -94,8 +88,7 @@ The core ML engine was built with a reproducible pipeline (`run_pipeline.py`) st
    cd airbnb-price-intelligence
    ```
 
-2. **Install Python dependencies:**
-   *(It is recommended to use a virtual environment)*
+2. **Install Python dependencies** *(for training/experimentation only — not needed to run the app):*
    ```bash
    pip install -r requirements.txt
    ```
@@ -109,22 +102,18 @@ The core ML engine was built with a reproducible pipeline (`run_pipeline.py`) st
 
 4. **View the app:**
    Open [http://localhost:3000](http://localhost:3000) in your browser.
-   > **Note:** In local development, the Next.js API automatically spawns a local Python subprocess to run inference. You do not need to run a separate Flask server locally.
 
 ---
 
-## 🚀 Deployment Guide
+## 🚀 Deployment
 
-### 1. Backend (Render)
-- Create a new **Web Service** tied to the repository.
-- **Root Directory:** `app/`
-- **Build Command:** `pip install -r requirements.txt`
-- **Start Command:** `gunicorn -w 2 -b 0.0.0.0:$PORT server:app --timeout 120`
+The entire application deploys to **Vercel** from a single push. No external services required.
 
-### 2. Frontend (Vercel)
-- Import the repo into Vercel and set the **Root Directory** to `app/`.
-- Set Environment Variable:
-  - `PYTHON_API_URL` = `https://<your-render-app>.onrender.com`
+1. Import the repo into [Vercel](https://vercel.com)
+2. Set **Root Directory** to `app/`
+3. Deploy — that's it. No environment variables needed.
+
+> **How ML works on Vercel:** The XGBoost model is stored as `app/models/model.json` (native XGBoost JSON, 6.2 MB). A pure TypeScript function in `app/api/predict/route.ts` walks the 700 decision trees at request time — achieving ~50ms predictions with zero native dependencies.
 
 ---
 
@@ -132,19 +121,23 @@ The core ML engine was built with a reproducible pipeline (`run_pipeline.py`) st
 
 ```text
 airbnb-price-intelligence/
-├── app/                        # Next.js Frontend & Python Backend Root
-│   ├── app/                    # React Pages & API Proxies (/predict, /reviews)
+├── app/                        # Next.js Application (deployed to Vercel)
+│   ├── app/                    # React Pages & API Routes
+│   │   ├── api/predict/        # TypeScript XGBoost inference (no Python)
+│   │   ├── api/analyze-reviews/# SQLite review lookup (better-sqlite3)
+│   │   ├── predict/            # Price Estimator page
+│   │   └── reviews/            # Review Analysis page
 │   ├── components/             # Reusable UI Components
-│   ├── models/                 # Serialized ML artifacts (.pkl, .json, .db)
-│   ├── server.py               # Production Flask production entry point
-│   ├── predict_api.py          # Inference script (called locally via subprocess)
-│   └── review_analysis_api.py  # NLP dashboard script
-├── src/                        # Machine Learning Source Code
+│   └── models/                 # ML artifacts
+│       ├── model.json          # XGBoost (700 trees, 52 features) — 6.2 MB
+│       ├── feature_names.json  # Feature order & metadata
+│       └── reviews_summary.db  # Precomputed review analysis — 86 MB
+├── src/                        # ML Training Source Code
 │   ├── data_preprocessing.py   # Cleaning & imputation
 │   └── feature_engineering.py  # Geographic & sentiment feature creation
 ├── run_pipeline.py             # End-to-end model training script
-├── Project_Journey.md          # Complete documentation of the development process
-└── requirements.txt            # Python environment dependencies
+├── convert_model_to_onnx.py    # Model export utility
+└── requirements.txt            # Python dependencies (training only)
 ```
 
 ---

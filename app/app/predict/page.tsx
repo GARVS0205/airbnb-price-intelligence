@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import InputForm from "@/components/InputForm";
 import PredictionDisplay from "@/components/PredictionDisplay";
 import NavBar from "@/components/NavBar";
@@ -11,11 +11,6 @@ const NAV = [
   { href: "/reviews", label: "Review Analysis",  active: false },
 ];
 
-/** Re-ping the backend every POLL_MS until it's warm */
-const POLL_MS = 12_000;
-/** Estimated cold-start duration — the progress bar fills over this many seconds */
-const WARMUP_ESTIMATE_S = 45;
-
 export default function PredictPage() {
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [loading, setLoading]       = useState(false);
@@ -23,68 +18,7 @@ export default function PredictPage() {
   const [errorDetails, setErrorDetails] = useState<string[]>([]);
   const [formData, setFormData]     = useState<FormData | null>(null);
 
-  // Backend warmup state
-  const [warmStatus, setWarmStatus]     = useState<"checking" | "warming" | "warm">("checking");
-  const [warmElapsed, setWarmElapsed]   = useState(0);       // seconds since page load
-  const [warmJustReady, setWarmJustReady] = useState(false); // brief "Ready!" flash
-
-  const resultsRef   = useRef<HTMLDivElement>(null);
-  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const elapsedRef   = useRef<ReturnType<typeof setInterval> | null>(null);
-  const warmedRef    = useRef(false);
-
-  const stopPolling = useCallback(() => {
-    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-    if (elapsedRef.current)   clearInterval(elapsedRef.current);
-  }, []);
-
-  const pingOnce = useCallback(async (): Promise<boolean> => {
-    try {
-      const res = await fetch("/api/ping", { method: "GET" });
-      const d   = await res.json();
-      return d.status === "warm" || d.status === "local";
-    } catch {
-      return false;
-    }
-  }, []);
-
-  const schedulePoll = useCallback(() => {
-    if (warmedRef.current) return;
-    pollTimerRef.current = setTimeout(async () => {
-      const isWarm = await pingOnce();
-      if (isWarm && !warmedRef.current) {
-        warmedRef.current = true;
-        stopPolling();
-        setWarmStatus("warm");
-        setWarmJustReady(true);
-        setTimeout(() => setWarmJustReady(false), 2500);
-      } else if (!warmedRef.current) {
-        schedulePoll(); // keep retrying every POLL_MS
-      }
-    }, POLL_MS);
-  }, [pingOnce, stopPolling]);
-
-  // On mount: ping immediately, start elapsed counter, schedule retry loop
-  useEffect(() => {
-    // Tick elapsed seconds
-    elapsedRef.current = setInterval(() => {
-      setWarmElapsed(s => s + 1);
-    }, 1000);
-
-    // First ping immediately
-    pingOnce().then(isWarm => {
-      if (isWarm) {
-        warmedRef.current = true;
-        stopPolling();
-        setWarmStatus("warm");
-      } else {
-        setWarmStatus("warming");
-        schedulePoll();
-      }
-    });
-
-    return () => stopPolling();
-  }, [pingOnce, schedulePoll, stopPolling]);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const handlePredict = async (data: FormData) => {
     setLoading(true);
@@ -116,11 +50,6 @@ export default function PredictPage() {
     }
   };
 
-  // Progress bar: fills over WARMUP_ESTIMATE_S, caps at 95% until confirmed warm
-  const progressPct = warmStatus === "warm"
-    ? 100
-    : Math.min(95, (warmElapsed / WARMUP_ESTIMATE_S) * 100);
-
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <NavBar nav={NAV} showModelLive />
@@ -130,7 +59,7 @@ export default function PredictPage() {
         <div className="page-pad" style={{ maxWidth: 1200, margin: "0 auto", paddingTop: 40, paddingBottom: 36 }}>
           <h1 className="page-title" style={{ marginBottom: 10, maxWidth: 560 }}>NYC Airbnb Price Estimator</h1>
           <p style={{ fontSize: 14, color: "var(--text-muted)", lineHeight: 1.6, maxWidth: 500 }}>
-            Fill in your listing details and get an accurate nightly price estimate for any NYC property in seconds.
+            Fill in your listing details and get an accurate nightly price estimate powered by machine learning.
             Add a Listing ID to factor in your real guest review quality.
           </p>
         </div>
@@ -139,54 +68,11 @@ export default function PredictPage() {
       <main style={{ flex: 1, background: "var(--bg)" }}>
         <div className="page-pad" style={{ maxWidth: 1200, margin: "0 auto", paddingTop: 32, paddingBottom: 64 }}>
 
-          {/* ── Warming up banner with animated progress bar ── */}
-          {warmStatus === "warming" && !loading && (
-            <div style={{ marginBottom: 16, borderRadius: 10, background: "var(--warning-dim)", overflow: "hidden" }}>
-              <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                  <span style={{ fontSize: 15 }}>⚡</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--warning)" }}>
-                      Warming up ML backend… ({warmElapsed}s)
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--warning)", opacity: 0.8, marginTop: 2 }}>
-                      First request takes ~30–45s on free tier. You can click Predict now — it will queue and run once ready.
-                    </div>
-                  </div>
-                </div>
-                <span style={{ fontSize: 11, color: "var(--warning)", fontWeight: 500, flexShrink: 0, marginLeft: 12 }}>
-                  ~{Math.max(0, WARMUP_ESTIMATE_S - warmElapsed)}s left
-                </span>
-              </div>
-              {/* Animated progress bar */}
-              <div style={{ height: 3, background: "rgba(217,119,6,0.15)" }}>
-                <div style={{
-                  height: "100%",
-                  background: "var(--warning)",
-                  width: `${progressPct}%`,
-                  transition: "width 1s linear",
-                  borderRadius: "0 99px 99px 0",
-                }} />
-              </div>
-            </div>
-          )}
-
-          {/* ── Backend just became ready ── */}
-          {warmJustReady && !loading && (
-            <div style={{ marginBottom: 16, padding: "10px 16px", borderRadius: 8, background: "var(--success-dim)", fontSize: 12, color: "var(--success)", display: "flex", alignItems: "center", gap: 8, fontWeight: 500 }}>
-              <span>✓</span>
-              <span>ML backend is ready — predictions will be fast now.</span>
-            </div>
-          )}
-
-          {/* ── Inference in progress ── */}
+          {/* Loading indicator */}
           {loading && (
             <div style={{ marginBottom: 16, padding: "10px 16px", borderRadius: 8, background: "var(--primary-dim)", fontSize: 12, color: "var(--primary)", display: "flex", alignItems: "center", gap: 8 }}>
               <span className="spinner" style={{ borderColor: "rgba(37,99,235,0.3)", borderTopColor: "var(--primary)" }} />
-              <span>
-                Running ML inference…
-                {warmStatus !== "warm" && " (waiting for backend to warm up first)"}
-              </span>
+              <span>Running ML inference…</span>
             </div>
           )}
 
@@ -194,18 +80,9 @@ export default function PredictPage() {
             <div className="card">
               <div className="card-header">
                 <span className="card-header-title">Listing Details</span>
-                {/* Mini backend status in card header */}
-                {warmStatus === "warm" && !warmJustReady && (
-                  <span style={{ fontSize: 11, color: "var(--success)", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
-                    <span className="live-dot" style={{ width: 6, height: 6 }} /> Ready
-                  </span>
-                )}
-                {warmStatus === "warming" && (
-                  <span style={{ fontSize: 11, color: "var(--warning)", fontWeight: 500 }}>Warming up…</span>
-                )}
-                {warmStatus === "checking" && (
-                  <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>Checking…</span>
-                )}
+                <span style={{ fontSize: 11, color: "var(--success)", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}>
+                  <span className="live-dot" style={{ width: 6, height: 6 }} /> Ready
+                </span>
               </div>
               <InputForm onSubmit={handlePredict} loading={loading} />
             </div>

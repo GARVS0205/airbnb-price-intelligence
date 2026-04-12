@@ -1,50 +1,48 @@
-# Core data science
+# ── Core data science ──────────────────────────────────────────────────────
 numpy>=1.24.0
 pandas>=2.0.0
 scipy>=1.10.0
 
-
-# Machine learning
+# ── Machine learning ───────────────────────────────────────────────────────
 scikit-learn>=1.3.0
 xgboost>=2.0.0
 lightgbm>=4.0.0
 
-# Visualization
-matplotlib>=3.7.0
-seaborn>=0.12.0
-plotly>=5.18.0
-
-# NLP
+# ── NLP ────────────────────────────────────────────────────────────────────
 nltk>=3.8.0
 vaderSentiment>=3.3.2
 textblob>=0.17.0
 
-# Model serialization
+# ── Model serialization ────────────────────────────────────────────────────
 joblib>=1.3.0
 
-# SHAP for model interpretability
+# ── SHAP for model interpretability ───────────────────────────────────────
 shap>=0.44.0
 
-# Geospatial
+# ── Visualization ──────────────────────────────────────────────────────────
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.18.0
+
+# ── Geospatial ─────────────────────────────────────────────────────────────
 geopy>=2.4.0
 
-# Jupyter
+# ── Jupyter (local development only) ──────────────────────────────────────
 jupyter>=1.0.0
 notebook>=7.0.0
 ipykernel>=6.20.0
 nbconvert>=7.0.0
 
-# Utilities
+# ── Utilities ─────────────────────────────────────────────────────────────
 tqdm>=4.65.0
 python-dotenv>=1.0.0
-
-# Missing value visualization
 missingno>=0.5.2
-
-# Category encoders
 category-encoders>=2.6.0
 
-# Flask API server (for Railway/Render deployment)
-flask>=3.0.0
-flask-cors>=4.0.0
-gunicorn>=21.0.0
+# ── ONNX conversion (one-time model export only) ──────────────────────────
+onnxmltools>=1.16.0
+skl2onnx>=1.20.0
+onnxruntime>=1.24.0
+
+# NOTE: Flask/gunicorn/flask-cors removed — backend now runs on Vercel
+# (pure TypeScript XGBoost inference + better-sqlite3 for reviews)
