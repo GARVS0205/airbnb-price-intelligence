@@ -1,42 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
-import { spawn } from "child_process";
 
-export const maxDuration = 60; // Vercel Hobby plan max is 60s
+export const maxDuration = 60;
+
 /**
  * POST /api/analyze-reviews
  *
- * In production (Vercel): forwards request to PYTHON_API_URL (Flask backend on Railway/Render)
- * In development (local): spawns Python subprocess directly
+ * Reads precomputed review analysis directly from the SQLite database
+ * (app/models/reviews_summary.db) using better-sqlite3.
+ * No Python, no Flask, no external backend — everything runs on Vercel.
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const listing_id  = parseInt(String(body.listing_id ?? 0));
-    const max_reviews = parseInt(String(body.max_reviews ?? 300));
+    const listing_id = parseInt(String(body.listing_id ?? 0), 10);
 
     if (!listing_id || listing_id <= 0) {
-      return NextResponse.json({ error: "A valid listing_id is required." }, { status: 400 });
+      return NextResponse.json(
+        { error: "A valid listing_id is required." },
+        { status: 400 }
+      );
     }
 
-    const pythonApiUrl = process.env.PYTHON_API_URL;
+    // Dynamic import — better-sqlite3 is a native Node.js module
+    const Database = (await import("better-sqlite3")).default;
+    const dbPath   = path.join(process.cwd(), "models", "reviews_summary.db");
 
-    if (pythonApiUrl) {
-      // ── Production: call Flask backend via HTTP ──────────────────────────
-      const res = await fetch(`${pythonApiUrl}/analyze-reviews`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listing_id, max_reviews }),
-        signal: AbortSignal.timeout(55_000),  // 55s — leaves 5s headroom for Vercel's 60s limit
-      });
-      const data = await res.json();
-      return NextResponse.json(data, { status: res.ok ? 200 : 500 });
-    } else {
-      // ── Development: spawn Python subprocess ────────────────────────────
-      const scriptPath = path.join(process.cwd(), "review_analysis_api.py");
-      const pythonCmd = resolvePythonCommand();
-      const result = await runPythonScript(scriptPath, { listing_id, max_reviews }, pythonCmd);
-      return NextResponse.json(result, { status: 200 });
+    let db: InstanceType<typeof Database> | null = null;
+    try {
+      db = new Database(dbPath, { readonly: true, fileMustExist: true });
+    } catch (e) {
+      return NextResponse.json(
+        { error: "Reviews database not found. Ensure reviews_summary.db is deployed." },
+        { status: 500 }
+      );
+    }
+
+    try {
+      const row = db
+        .prepare("SELECT analysis_data FROM reviews_summary WHERE listing_id = ?")
+        .get(listing_id) as { analysis_data: string } | undefined;
+
+      if (!row || !row.analysis_data || row.analysis_data === "{}") {
+        return NextResponse.json(
+          { error: `No reviews found for listing ${listing_id}. Try IDs like 2539, 2595, 3176.` },
+          { status: 404 }
+        );
+      }
+
+      const data = JSON.parse(row.analysis_data);
+      return NextResponse.json(data, { status: 200 });
+
+    } finally {
+      db.close();
     }
 
   } catch (error: unknown) {
@@ -44,45 +60,4 @@ export async function POST(request: NextRequest) {
     console.error("[/api/analyze-reviews] Error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
-}
-
-// ── Cross-platform Python resolution (Windows friendly) ─────────────────────
-function resolvePythonCommand(): string {
-  if (process.env.PYTHON_CMD && process.env.PYTHON_CMD.trim()) {
-    return process.env.PYTHON_CMD.trim();
-  }
-  if (process.platform === "win32") {
-    return "python"; // Windows images typically expose `python` and `py`
-  }
-  return "python3"; // Unix-like default
-}
-
-// ── Local dev: Python subprocess ─────────────────────────────────────────────
-function runPythonScript(
-  scriptPath: string,
-  payload: Record<string, unknown>,
-  pythonCmd: string
-): Promise<Record<string, unknown>> {
-  return new Promise((resolve, reject) => {
-    const python = spawn(pythonCmd, ["-X", "utf8", scriptPath], {
-      shell: process.platform === "win32",
-    });
-    let stdout = "";
-    let stderr = "";
-
-    python.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
-    python.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
-
-    python.on("close", (code: number) => {
-      if (code !== 0) { reject(new Error(`Python script failed (code ${code}): ${stderr}`)); return; }
-      try {
-        const result = JSON.parse(stdout.trim());
-        if (result.error) { reject(new Error(result.error)); } else { resolve(result); }
-      } catch { reject(new Error(`Failed to parse Python output: ${stdout.substring(0, 300)}`)); }
-    });
-
-    python.on("error", (err: Error) => { reject(new Error(`Failed to spawn Python: ${err.message}`)); });
-    python.stdin.write(JSON.stringify(payload));
-    python.stdin.end();
-  });
 }

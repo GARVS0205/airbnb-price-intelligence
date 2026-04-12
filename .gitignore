@@ -38,6 +38,8 @@ data/README.md
 !models/*.pkl
 !models/*.joblib
 !models/*.json
+# ONNX model for Node.js inference (3.6MB — deployed on Vercel directly)
+!models/*.onnx
 # Remove the old blanket exclusion
 # models/*.pkl  <- now tracked
 
