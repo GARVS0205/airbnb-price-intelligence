@@ -146,7 +146,7 @@ function buildFeatureVector(body: Record<string, unknown>): number[] {
   const bedsPerPerson      = beds / Math.max(accommodates, 1);
   const availRate          = availability / 365;
   const hostQualityScore   = (isSuperhost + hostResponse + hostAccept) / 3;
-  const hostExpYears       = hostExpDays / 365;
+  const hostExpYears       = hostExpDays / 365.25; // match training pipeline (accounts for leap years)
   const isProfessionalHost = hostListings >= 5 ? 1 : 0;
   const hasReviews         = numReviews > 0 ? 1 : 0;
   const reviewsPerMonth    = Math.min(30, num(body.reviews_per_month, 1));
