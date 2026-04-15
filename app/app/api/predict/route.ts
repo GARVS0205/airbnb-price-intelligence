@@ -92,6 +92,10 @@ function loadModel(): XGBModel {
 }
 
 // ── Pure TypeScript XGBoost inference ───────────────────────────────────────
+// IMPORTANT: XGBoost uses float32 internally. We must apply Math.fround() to
+// both the feature value and split condition before comparing, otherwise float64
+// precision causes boundary cases (e.g. Entire home/apt) to route the wrong
+// branch — producing predictions that diverge from the sklearn pkl model.
 function xgbPredict(features: number[]): number {
   const model = loadModel();
   let score = model.baseScore;
@@ -99,8 +103,10 @@ function xgbPredict(features: number[]): number {
   for (const tree of model.trees) {
     let node = 0;
     while (tree.left_children[node] !== -1) {   // -1 = leaf
-      const featureVal = features[tree.split_indices[node]];
-      node = featureVal < tree.split_conditions[node]
+      // Use float32 precision to match XGBoost's internal comparison
+      const featureVal = Math.fround(features[tree.split_indices[node]]);
+      const condition  = Math.fround(tree.split_conditions[node]);
+      node = featureVal < condition
         ? tree.left_children[node]
         : tree.right_children[node];
     }
