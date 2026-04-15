@@ -36,13 +36,18 @@ const FEATURE_NAMES = [
 const N_FEATURES = FEATURE_NAMES.length; // 52
 
 // Room type target-encoding (mean log-price per room type from training)
+// Values sourced from models/feature_names.json → room_type_mean_prices
+// sklearn LabelEncoder encodes alphabetically:
+//   0=Entire home/apt, 1=Hotel room, 2=Private room, 3=Shared room
 const RT_LABEL_TO_NAME: Record<number, string> = {
   0: "Entire home/apt", 1: "Hotel room",
   2: "Private room",    3: "Shared room",
 };
 const RT_MEAN_LOG_PRICE: Record<string, number> = {
-  "Entire home/apt": 5.14, "Hotel room":  4.98,
-  "Private room":    4.48, "Shared room": 4.20,
+  "Entire home/apt": 5.348992801453218,
+  "Hotel room":      5.715659291730132,
+  "Private room":    4.556679818903923,
+  "Shared room":     4.288098275819825,
 };
 
 // ── Types for XGBoost JSON model ────────────────────────────────────────────
