@@ -50,7 +50,18 @@ export default function InputForm({ onSubmit, loading }: Props) {
     has_washer: true,  has_ac: true,  has_workspace: false,
     is_superhost: false, instant_bookable: false, has_luxury_keywords: false,
   });
-  const s = (k: string, v: unknown) => setF(p => ({ ...p, [k]: v }));
+  // When accommodates changes, auto-sync beds upward (never let beds < 1 or > accommodates*2)
+  const s = (k: string, v: unknown) => setF(p => {
+    const next = { ...p, [k]: v };
+    if (k === "accommodates") {
+      const acc = Math.max(1, Number(v));
+      next.beds = Math.min(Math.max(p.beds, 1), acc); // beds ≤ accommodates
+    }
+    if (k === "beds") {
+      next.beds = Math.min(Number(v), p.accommodates); // hard cap at accommodates
+    }
+    return next;
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,14 +152,35 @@ export default function InputForm({ onSubmit, loading }: Props) {
         </div>
         {/* 2-col on all screen sizes, each field is a comfortable touch target */}
         <div className="form-grid-2">
-          {([["accommodates","Guests"],["bedrooms","Bedrooms"],["bathrooms","Bathrooms"],["beds","Beds"]] as [keyof typeof f, string][]).map(([k,l]) => (
-            <div key={k}>
-              <Label text={l} />
-              <input type="number" min="0" max="20" step={k==="bathrooms"?"0.5":"1"}
-                className="input" value={f[k] as number}
-                onChange={e => s(k, parseFloat(e.target.value))} />
-            </div>
-          ))}
+          <div>
+            <Label text="Guests" />
+            <input type="number" min="1" max="16" step="1" className="input"
+              value={f.accommodates}
+              onChange={e => s("accommodates", parseFloat(e.target.value))} />
+          </div>
+          <div>
+            <Label text="Bedrooms" />
+            <input type="number" min="0" max="20" step="1" className="input"
+              value={f.bedrooms}
+              onChange={e => s("bedrooms", parseFloat(e.target.value))} />
+          </div>
+          <div>
+            <Label text="Bathrooms" />
+            <input type="number" min="0" max="20" step="0.5" className="input"
+              value={f.bathrooms}
+              onChange={e => s("bathrooms", parseFloat(e.target.value))} />
+          </div>
+          <div>
+            <Label text="Beds" />
+            <input type="number" min="1" max={f.accommodates} step="1" className="input"
+              value={f.beds}
+              onChange={e => s("beds", parseFloat(e.target.value))} />
+            {f.beds > f.accommodates && (
+              <p style={{ fontSize: 11, color: "var(--amber)", marginTop: 4 }}>
+                Tip: beds are capped at guest count for accurate pricing
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
